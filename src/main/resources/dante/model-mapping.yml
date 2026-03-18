@@ -1,0 +1,60 @@
+models:
+  - model:
+      name: Generic
+      vendor: DanteDomainManager
+      filter: true
+      mapping:
+        deviceId: get("id")
+        deviceName: get("name")
+        deviceModel: at("/identity/productModelName")
+        deviceOnline: at("/connection/state")?.asText()?.equalsIgnoreCase("READY")
+      properties:
+        Manufacturer: at("/manufacturer/name")
+        ProductVersion: at("/identity/productVersion")
+        ConnectedSince(GMT): at("/connection/lastChanged")
+        EnrolmentState: get("enrolmentState")
+
+        Clocking: at("/status/clocking")
+        Connectivity: at("/status/connectivity")
+        Latency: at("/status/latency")
+        Subscriptions: at("/status/subscriptions")
+
+        ClockingMessage: at("/status/alertMessage/clocking")
+        ConnectivityMessage: at("/status/alertMessage/connectivity")
+        LatencyMessage: at("/status/alertMessage/latency")
+        SubscriptionsMessage: at("/status/alertMessage/subscriptions")
+
+        Location: get("location")
+        Description: get("description")
+        Comments: get("comments")
+        Site: at("/domain/name")
+
+        DiscoveryType: at("/discovery/type")
+        DiscoveryDomainName: at("/discovery/fqdn")
+
+        IPAddress: at("/interfaces/0/address")
+        MACAddress: at("/interfaces/0/macAddress")
+        Subnet: at("/interfaces/0/subnet")
+        Netmask: at("/interfaces/0/netmask")
+
+        DanteSoftwareVersion: at("/identity/productSoftwareVersion")
+        DanteVersion: at("/identity/danteVersion")
+
+        MuteStatus: at("/clockingState/muteStatus")
+        SyncStatus: at("/clockingState/locked")
+        DomainClocking: at("/clockingState/grandLeader")
+        PrimaryMulticast: at("/clockingState/multicastLeader")
+        UnicastFollower: at("/clockingState/unicastFollower")
+        UnicastLeader: at("/clockingState/unicastLeader")
+
+        SyncToExternalWordClock: at("/clockPreferences/externalWordClock")
+        PreferredLeader: at("/clockPreferences/leader")
+        UnicastClocking: at("/clockPreferences/unicastClocking")
+        V1DelayRequests: at("/clockPreferences/v1UnicastDelayRequests")
+
+        SyncToExternalWordClockCapability: at("/capabilities/CAN_WRITE_EXT_WORD_CLOCK")
+        PreferredLeaderCapability: at("/capabilities/CAN_WRITE_PREFERRED_MASTER")
+        UnicastClockingCapability: at("/capabilities/CAN_UNICAST_CLOCKING")
+        V1DelayRequestsCapability: at("/capabilities/CAN_WRITE_UNICAST_DELAY_REQUESTS")
+
+        FrequencyOffset(ppm): at("/clockingState/frequencyOffset")
