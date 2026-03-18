@@ -16,7 +16,6 @@ public class ChannelDTO {
 	private String subscribedChannel;
 	private String subscribedDevice;
 
-
 	/**
 	 * Constructs a ChannelDTO with the specified properties.
 	 *

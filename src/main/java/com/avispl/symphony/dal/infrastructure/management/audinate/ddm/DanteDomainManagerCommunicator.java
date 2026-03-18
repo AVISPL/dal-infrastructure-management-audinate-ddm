@@ -25,7 +25,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.util.CollectionUtils;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import javax.security.auth.login.FailedLoginException;
@@ -43,12 +42,10 @@ import com.avispl.symphony.dal.aggregator.parser.AggregatedDeviceProcessor;
 import com.avispl.symphony.dal.aggregator.parser.PropertiesMapping;
 import com.avispl.symphony.dal.aggregator.parser.PropertiesMappingParser;
 import com.avispl.symphony.dal.communicator.RestCommunicator;
-import com.avispl.symphony.dal.infrastructure.management.audinate.ddm.common.AggregatedControllableProperty;
 import com.avispl.symphony.dal.infrastructure.management.audinate.ddm.common.AggregatedInformation;
 import com.avispl.symphony.dal.infrastructure.management.audinate.ddm.common.DanteDomainManagerConstant;
 import com.avispl.symphony.dal.infrastructure.management.audinate.ddm.common.DanteDomainManagerQuery;
 import com.avispl.symphony.dal.infrastructure.management.audinate.ddm.common.SystemInformation;
-import com.avispl.symphony.dal.infrastructure.management.audinate.ddm.dto.ChannelDTO;
 import com.avispl.symphony.dal.util.StringUtils;
 
 /**
@@ -272,11 +269,6 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 	private long lastMonitoringCycleDuration;
 
 	/**
-	 * Device adapter instantiation timestamp.
-	 */
-	private long adapterInitializationTimestamp;
-
-	/**
 	 * Private variable representing the local extended statistics.
 	 */
 	private ExtendedStatistics localExtendedStatistics;
@@ -335,7 +327,6 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 			Map<String, String> dynamicStatistics = new HashMap<>();
 			List<AdvancedControllableProperty> advancedControllableProperties = new ArrayList<>();
 			ExtendedStatistics extendedStatistics = new ExtendedStatistics();
-			retrieveMetadata(statistics, dynamicStatistics);
 			retrieveSystemInfo();
 			populateSystemInfo(statistics, advancedControllableProperties);
 			extendedStatistics.setStatistics(statistics);
@@ -353,62 +344,6 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 	 */
 	@Override
 	public void controlProperty(ControllableProperty controllableProperty) throws Exception {
-		reentrantLock.lock();
-		try {
-			String property = controllableProperty.getProperty();
-			String deviceId = removeAggregatorPrefix(controllableProperty.getDeviceId());
-			String value = String.valueOf(controllableProperty.getValue());
-
-			String[] propertyList = property.split(DanteDomainManagerConstant.HASH);
-			String propertyName = property;
-			if (property.contains(DanteDomainManagerConstant.HASH)) {
-				propertyName = propertyList[1];
-			}
-			if (DanteDomainManagerConstant.SITE_NAME.equals(propertyName)) {
-				Optional<JsonNode> matchingDomain = domainList.stream().filter(item -> item.get(DanteDomainManagerConstant.NAME).asText().equals(value)).findFirst();
-				if (matchingDomain.isPresent()) {
-					currentSiteValue = matchingDomain.get();
-				} else {
-					throw new IllegalArgumentException("Error when control SiteName");
-				}
-			} else {
-				Optional<AggregatedDevice> aggregatedDevice = aggregatedDeviceList.stream().filter(item -> removeAggregatorPrefix(item.getDeviceId()).equals(deviceId)).findFirst();
-				if (aggregatedDevice.isPresent()) {
-					AggregatedInformation item = AggregatedInformation.getByDefaultName(propertyName);
-					switch (item) {
-						case LEADER:
-						case DELAY_REQUEST:
-						case EXTERNAL_WORD_CLOCK:
-						case UNICAST_CLOCKING:
-							AggregatedControllableProperty aggregatedProperty = AggregatedControllableProperty.getByDefaultName(propertyName);
-							String requestValue = DanteDomainManagerConstant.NUMBER_ONE.equals(value) ? DanteDomainManagerConstant.TRUE : DanteDomainManagerConstant.FALSE;
-							sendCommandToControlDevice(deviceId, requestValue, aggregatedProperty);
-							updateCacheValue(deviceId, propertyName, requestValue);
-							break;
-						case SITE_NAME:
-							Optional<JsonNode> node = domainList.stream().filter(itemValue -> itemValue.get(DanteDomainManagerConstant.NAME).asText().equals(value)).findFirst();
-							if (!node.isPresent()) {
-								throw new IllegalArgumentException("Error when control SiteName with value is " + value);
-							}
-							sendCommandToControlTheSiteName(deviceId, node.get().get(DanteDomainManagerConstant.ID).asText(), value);
-							updateCacheValue(deviceId, propertyName, value);
-							for (AggregatedControllableProperty control : AggregatedControllableProperty.values()) {
-								updateCacheValue(deviceId, control.getName(), "false");
-							}
-							break;
-						default:
-							if (logger.isWarnEnabled()) {
-								logger.warn(String.format("Unable to execute %s command on device %s: Not Supported", property, deviceId));
-							}
-							break;
-					}
-				} else {
-					throw new IllegalArgumentException(String.format("Unable to control property: %s as the device does not exist.", property));
-				}
-			}
-		} finally {
-			reentrantLock.unlock();
-		}
 	}
 
 	/**
@@ -423,7 +358,7 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 			try {
 				controlProperty(p);
 			} catch (Exception e) {
-				logger.error(String.format("Error when control property %s", p.getProperty()), e);
+				logger.error(String.format("An error occurred when control property %s", p.getProperty()), e);
 			}
 		}
 	}
@@ -479,7 +414,6 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 		if (logger.isDebugEnabled()) {
 			logger.debug("Internal init is called.");
 		}
-		adapterInitializationTimestamp = System.currentTimeMillis();
 		executorService = Executors.newFixedThreadPool(1);
 		executorService.submit(deviceDataLoader = new DanteDomainManagerDataLoader());
 		super.internalInit();
@@ -514,75 +448,6 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 	}
 
 	/**
-	 * Sends a control command to the specified device for a controllable property.
-	 *
-	 * @param deviceId The ID of the device to control.
-	 * @param value The value to set for the controllable property.
-	 * @param property The controllable property to control.
-	 */
-	private void sendCommandToControlDevice(String deviceId, String value, AggregatedControllableProperty property) {
-		try {
-			String command = String.format(DanteDomainManagerQuery.CONTROL_CLOCK_SYNC, property.getCommandParam(), property.getCommandName(), deviceId, value);
-			JsonNode response = this.doPost(DanteDomainManagerConstant.URL, command, JsonNode.class);
-			if (response.has(DanteDomainManagerConstant.ERRORS)) {
-				throw new IllegalArgumentException("The command response is error");
-			}
-
-		} catch (Exception e) {
-			throw new IllegalArgumentException(
-					String.format("Can't control %s with value is %s. %s", property.getName(), DanteDomainManagerConstant.TRUE.equals(value) ? DanteDomainManagerConstant.ON : DanteDomainManagerConstant.OFF, e.getMessage()));
-		}
-	}
-
-	/**
-	 * Sends a command to control the site name associated with the specified device ID and domain ID.
-	 *
-	 * @param deviceId The ID of the device.
-	 * @param domainId The ID of the domain.
-	 * @param siteName The new site name to set.
-	 * @throws IllegalArgumentException If the command response indicates an error, or if an error occurs during the execution of the command.
-	 */
-	private void sendCommandToControlTheSiteName(String deviceId, String domainId, String siteName) {
-		try {
-			String command = String.format(DanteDomainManagerQuery.CONTROL_SITE, deviceId, domainId);
-			JsonNode response = this.doPost(DanteDomainManagerConstant.URL, command, JsonNode.class);
-			if (response.has(DanteDomainManagerConstant.ERRORS)) {
-				throw new IllegalArgumentException("The command response is error");
-			}
-		} catch (Exception e) {
-			throw new IllegalArgumentException(String.format("Can't control SiteName with value is %s. %s", siteName, e.getMessage()));
-		}
-	}
-
-	/**
-	 * Retrieves metadata information and updates the provided statistics and dynamic map.
-	 *
-	 * @param stats the map where statistics will be stored
-	 * @param dynamicStatistics the map where dynamic statistics will be stored
-	 */
-	private void retrieveMetadata(Map<String, String> stats, Map<String, String> dynamicStatistics) {
-		try {
-			dynamicStatistics.put(DanteDomainManagerConstant.MONITORING_CYCLE_DURATION, String.valueOf(lastMonitoringCycleDuration));
-			stats.put(DanteDomainManagerConstant.ADAPTER_VERSION,
-					getDefaultValueForNullData(adapterProperties.getProperty("aggregator.version")));
-			stats.put(DanteDomainManagerConstant.ADAPTER_BUILD_DATE,
-					getDefaultValueForNullData(adapterProperties.getProperty("aggregator.build.date")));
-			long adapterUptime = System.currentTimeMillis() - adapterInitializationTimestamp;
-
-			stats.put(DanteDomainManagerConstant.ADAPTER_UPTIME_MIN, String.valueOf(adapterUptime / (1000 * 60)));
-			stats.put(DanteDomainManagerConstant.ADAPTER_UPTIME, normalizeUptime(adapterUptime / 1000));
-			try{
-				stats.put(DanteDomainManagerConstant.SYSTEM_MONITORING_CYCLE, String.valueOf(getMonitoringRate()));
-			}catch (NoSuchMethodError error){
-				logger.warn("Unsupported feature: getMonitoringRate isn't available on current Cloud Connector version.", error);
-			}
-			dynamicStatistics.put(DanteDomainManagerConstant.MONITORED_DEVICES_TOTAL, String.valueOf(aggregatedDeviceList.size()));
-		} catch (Exception e) {
-			logger.error("Failed to populate metadata information", e);
-		}
-	}
-
-	/**
 	 * Retrieves system information by making a POST request to Dante Domain Manager and updating the domain list.
 	 * Throws exceptions in case of errors during the process, such as failed login, resource not reachable, or missing data.
 	 *
@@ -593,15 +458,15 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 		JsonNode response = this.doPost(DanteDomainManagerConstant.URL, DanteDomainManagerQuery.SYSTEM_INFO, JsonNode.class);
 
 		if (response.has(DanteDomainManagerConstant.ERRORS) && checkUnauthenticated(response.get(DanteDomainManagerConstant.ERRORS))) {
-			throw new FailedLoginException("Error while login. Please check the credentials");
+			throw new FailedLoginException("Unable to login. Please check the credentials");
 		}
 
 		if (!response.has(DanteDomainManagerConstant.DATA) || !response.get(DanteDomainManagerConstant.DATA).has(DanteDomainManagerConstant.DOMAINS)) {
-			throw new ResourceNotReachableException("Error when retrieve system information.");
+			throw new IllegalStateException("Error while retrieve system information.");
 		}
 
 		if (response.get(DanteDomainManagerConstant.DATA).get(DanteDomainManagerConstant.DOMAINS).isEmpty()) {
-			throw new ResourceNotReachableException("The Account is empty");
+			throw new IllegalStateException("No domains found for the current account.");
 		} else {
 			domainList.clear();
 			for (JsonNode item : response.get(DanteDomainManagerConstant.DATA).get(DanteDomainManagerConstant.DOMAINS)) {
@@ -806,42 +671,10 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 								DanteDomainManagerConstant.TRUE.equals(value) ? DanteDomainManagerConstant.NUMBER_ONE : DanteDomainManagerConstant.ZERO);
 					}
 					break;
-//				case SITE_NAME:
-//					List<String> siteNameList = domainList.stream().map(node -> node.get(DanteDomainManagerConstant.NAME).asText()).collect(Collectors.toList());
-//					addAdvancedControlProperties(advancedControllableProperties, stats, createDropdown(propertyName, siteNameList.toArray(new String[0]), value), value);
-//					break;
-				case RECEIVE_CHANNELS:
-					try {
-						List<ChannelDTO> channelList = objectMapper.readValue(value, new TypeReference<List<ChannelDTO>>() {
-						});
-						if (!channelList.isEmpty()) {
-							for (ChannelDTO item : channelList) {
-								String channelName = item.getName();
-								if (StringUtils.isNotNullOrEmpty(item.getSubscribedChannel()) && StringUtils.isNotNullOrEmpty(item.getSubscribedDevice())) {
-									stats.put(DanteDomainManagerConstant.RECEIVE_CHANNEL_GROUP + channelName, item.getSubscribedChannel() + "@" + item.getSubscribedDevice());
-								}
-							}
-						}
-					} catch (Exception e) {
-						logger.error("Error while retrieve Receive Channels", e);
-					}
-					break;
 				default:
 					stats.put(propertyName, value);
 			}
 		}
-	}
-
-	/**
-	 * Updates the cache value for a specified property in the aggregated device list.
-	 *
-	 * @param deviceId The ID of the device whose cache value needs to be updated.
-	 * @param name The name of the property to be updated.
-	 * @param value The new value to set for the property.
-	 */
-	private void updateCacheValue(String deviceId, String name, String value) {
-		cachedData.stream().filter(item -> deviceId.equals(item.getDeviceId()))
-				.findFirst().ifPresent(item -> item.getProperties().put(name, value));
 	}
 
 	/**
@@ -866,7 +699,7 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 			Date date = inputFormat.parse(inputDateTime);
 			return outputFormat.format(date);
 		} catch (Exception e) {
-			logger.warn("Can't convert the date time value");
+			logger.warn(String.format("Failed to convert date time. input='%s'. Error: %s", inputDateTime, e.getMessage()));
 			return DanteDomainManagerConstant.NOT_AVAILABLE;
 		}
 	}
@@ -958,19 +791,6 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 	 */
 	private String withAggregatorPrefix(String deviceId) {
 		return aggregatorDeviceName + "_" + deviceId;
-	}
-
-	/**
-	 * Removes the aggregator device name prefix from the given device ID if present.
-	 *
-	 * @param prefixedId the device ID with aggregator prefix
-	 * @return the original device ID without the aggregator prefix, or the input value if no prefix is found
-	 */
-	private String removeAggregatorPrefix(String prefixedId) {
-		if (prefixedId != null && prefixedId.startsWith(aggregatorDeviceName + "_")) {
-			return prefixedId.substring((aggregatorDeviceName + "_").length());
-		}
-		return prefixedId;
 	}
 
 	/**

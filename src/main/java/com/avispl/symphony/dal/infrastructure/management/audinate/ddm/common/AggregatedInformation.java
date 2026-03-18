@@ -38,7 +38,6 @@ public enum AggregatedInformation {
 	PRIMARY_MULTICAST("PrimaryMulticast", DanteDomainManagerConstant.CLOCK_SYNCHRONISATION_GROUP),
 	UNICAST("Unicast", DanteDomainManagerConstant.CLOCK_SYNCHRONISATION_GROUP),
 	FREQUENCY("FrequencyOffset(ppm)", DanteDomainManagerConstant.CLOCK_SYNCHRONISATION_GROUP),
-	RECEIVE_CHANNELS("ReceiveChannels", DanteDomainManagerConstant.CLOCK_SYNCHRONISATION_GROUP),
 
 	EXTERNAL_WORD_CLOCK("SyncToExternalWordClock", DanteDomainManagerConstant.CLOCK_SYNCHRONISATION_GROUP),
 	LEADER("PreferredLeader", DanteDomainManagerConstant.CLOCK_SYNCHRONISATION_GROUP),
