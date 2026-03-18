@@ -269,6 +269,11 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 	private long lastMonitoringCycleDuration;
 
 	/**
+	 * Device adapter instantiation timestamp.
+	 */
+	private long adapterInitializationTimestamp;
+
+	/**
 	 * Private variable representing the local extended statistics.
 	 */
 	private ExtendedStatistics localExtendedStatistics;
@@ -327,6 +332,7 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 			Map<String, String> dynamicStatistics = new HashMap<>();
 			List<AdvancedControllableProperty> advancedControllableProperties = new ArrayList<>();
 			ExtendedStatistics extendedStatistics = new ExtendedStatistics();
+			retrieveMetadata(statistics, dynamicStatistics);
 			retrieveSystemInfo();
 			populateSystemInfo(statistics, advancedControllableProperties);
 			extendedStatistics.setStatistics(statistics);
@@ -414,6 +420,7 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 		if (logger.isDebugEnabled()) {
 			logger.debug("Internal init is called.");
 		}
+		adapterInitializationTimestamp = System.currentTimeMillis();
 		executorService = Executors.newFixedThreadPool(1);
 		executorService.submit(deviceDataLoader = new DanteDomainManagerDataLoader());
 		super.internalInit();
@@ -445,6 +452,34 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 		aggregatedDeviceList.clear();
 		cachedData.clear();
 		super.internalDestroy();
+	}
+
+	/**
+	 * Retrieves metadata information and updates the provided statistics and dynamic map.
+	 *
+	 * @param stats the map where statistics will be stored
+	 * @param dynamicStatistics the map where dynamic statistics will be stored
+	 */
+	private void retrieveMetadata(Map<String, String> stats, Map<String, String> dynamicStatistics) {
+		try {
+			dynamicStatistics.put(DanteDomainManagerConstant.MONITORING_CYCLE_DURATION, String.valueOf(lastMonitoringCycleDuration));
+			stats.put(DanteDomainManagerConstant.ADAPTER_VERSION,
+					getDefaultValueForNullData(adapterProperties.getProperty("aggregator.version")));
+			stats.put(DanteDomainManagerConstant.ADAPTER_BUILD_DATE,
+					getDefaultValueForNullData(adapterProperties.getProperty("aggregator.build.date")));
+			long adapterUptime = System.currentTimeMillis() - adapterInitializationTimestamp;
+
+			stats.put(DanteDomainManagerConstant.ADAPTER_UPTIME_MIN, String.valueOf(adapterUptime / (1000 * 60)));
+			stats.put(DanteDomainManagerConstant.ADAPTER_UPTIME, normalizeUptime(adapterUptime / 1000));
+			try{
+				stats.put(DanteDomainManagerConstant.SYSTEM_MONITORING_CYCLE, String.valueOf(getMonitoringRate()));
+			}catch (NoSuchMethodError error){
+				logger.warn("Unsupported feature: getMonitoringRate isn't available on current Cloud Connector version.", error);
+			}
+			dynamicStatistics.put(DanteDomainManagerConstant.MONITORED_DEVICES_TOTAL, String.valueOf(aggregatedDeviceList.size()));
+		} catch (Exception e) {
+			logger.error("Failed to populate metadata information", e);
+		}
 	}
 
 	/**
