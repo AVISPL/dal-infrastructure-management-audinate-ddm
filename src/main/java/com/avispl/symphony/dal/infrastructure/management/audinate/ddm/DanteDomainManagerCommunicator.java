@@ -358,7 +358,7 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 			try {
 				controlProperty(p);
 			} catch (Exception e) {
-				logger.error(String.format("An error occurred when control property %s", p.getProperty()), e);
+				logger.error(String.format("An error occurred during %s control property processing", p.getProperty()), e);
 			}
 		}
 	}
@@ -462,11 +462,11 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 		}
 
 		if (!response.has(DanteDomainManagerConstant.DATA) || !response.get(DanteDomainManagerConstant.DATA).has(DanteDomainManagerConstant.DOMAINS)) {
-			throw new IllegalStateException("Error while retrieve system information.");
+			throw new RuntimeException("An error occurred during system information request.");
 		}
 
 		if (response.get(DanteDomainManagerConstant.DATA).get(DanteDomainManagerConstant.DOMAINS).isEmpty()) {
-			throw new IllegalStateException("No domains found for the current account.");
+			throw new RuntimeException("No domains found for the current account.");
 		} else {
 			domainList.clear();
 			for (JsonNode item : response.get(DanteDomainManagerConstant.DATA).get(DanteDomainManagerConstant.DOMAINS)) {
@@ -552,7 +552,7 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 				}
 			}
 		} catch (Exception e) {
-			logger.error("Error while populate aggregated device", e);
+			logger.error("An error occurred during aggregated device information request.", e);
 		}
 	}
 
