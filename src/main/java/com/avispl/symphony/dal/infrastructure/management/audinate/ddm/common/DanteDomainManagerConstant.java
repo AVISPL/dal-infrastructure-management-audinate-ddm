@@ -30,7 +30,7 @@ public class DanteDomainManagerConstant {
 	public static final String RECEIVE_CHANNEL_GROUP = "ReceiveChannels#";
 	public static final String DEFAULT_FORMAT_DATETIME = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'";
 	public static final String TARGET_FORMAT_DATETIME = "MMM d, yyyy, h:mm a";
-	public static final String SITE_NAME = "SiteName";
+	public static final String DOMAIN_NAME = "DomainName";
 	public static final String CAPABILITY = "Capability";
 	public static final String ERRORS = "errors";
 	public static final String DATA = "data";

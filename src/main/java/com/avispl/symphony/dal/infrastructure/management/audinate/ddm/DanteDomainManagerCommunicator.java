@@ -294,11 +294,6 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 	private List<AggregatedDevice> cachedData = Collections.synchronizedList(new ArrayList<>());
 
 	/**
-	 * Store the device name
-	 */
-	private final String aggregatorDeviceName = "DDM";
-
-	/**
 	 * current site value
 	 */
 	private JsonNode currentSiteValue;
@@ -385,7 +380,7 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 	 */
 	@Override
 	public List<AggregatedDevice> retrieveMultipleStatistics(List<String> list) throws Exception {
-		return retrieveMultipleStatistics().stream().filter(aggregatedDevice -> list.contains(withAggregatorPrefix(aggregatedDevice.getDeviceId()))).collect(Collectors.toList());
+		return retrieveMultipleStatistics().stream().filter(aggregatedDevice -> list.contains(aggregatedDevice.getDeviceId())).collect(Collectors.toList());
 	}
 
 	/**
@@ -519,12 +514,12 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 		//Name
 		String name = currentSiteValue.get(DanteDomainManagerConstant.NAME).asText();
 		if (domainList.size() > 1) {
-			addAdvancedControlProperties(advancedControllableProperties, stats, createDropdown("Sites#" + DanteDomainManagerConstant.SITE_NAME, siteNameList.toArray(new String[0]), name), name);
+			addAdvancedControlProperties(advancedControllableProperties, stats, createDropdown("Domains#" + DanteDomainManagerConstant.DOMAIN_NAME, siteNameList.toArray(new String[0]), name), name);
 		} else {
-			advancedControllableProperties.removeIf(item -> item.getName().equalsIgnoreCase(DanteDomainManagerConstant.SITE_NAME));
-			stats.put("Sites#" + DanteDomainManagerConstant.SITE_NAME + DanteDomainManagerConstant.SPACE, name);
+			advancedControllableProperties.removeIf(item -> item.getName().equalsIgnoreCase(DanteDomainManagerConstant.DOMAIN_NAME));
+			stats.put("Domains#" + DanteDomainManagerConstant.DOMAIN_NAME, name);
 		}
-		stats.put("Sites#SiteDeviceCount", String.valueOf(currentSiteValue.get(DanteDomainManagerConstant.DEVICES).size()));
+		stats.put("Domains#DomainDeviceCount", String.valueOf(currentSiteValue.get(DanteDomainManagerConstant.DEVICES).size()));
 	}
 
 	/**
@@ -567,7 +562,7 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 			for (AggregatedDevice item : cachedData) {
 				AggregatedDevice aggregatedDevice = new AggregatedDevice();
 				Map<String, String> cachedValue = item.getProperties();
-				aggregatedDevice.setDeviceId(withAggregatorPrefix(item.getDeviceId()));
+				aggregatedDevice.setDeviceId(item.getDeviceId());
 				aggregatedDevice.setDeviceModel(item.getDeviceModel());
 				aggregatedDevice.setDeviceName(item.getDeviceName());
 				aggregatedDevice.setDeviceOnline(item.getDeviceOnline());
@@ -781,16 +776,6 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 		dropDown.setLabels(values);
 
 		return new AdvancedControllableProperty(name, new Date(), dropDown, initialValue);
-	}
-
-	/**
-	 * Adds the aggregator device name as a prefix to the given device ID.
-	 *
-	 * @param deviceId the original device identifier (without prefix)
-	 * @return the device ID with the aggregator prefix applied
-	 */
-	private String withAggregatorPrefix(String deviceId) {
-		return aggregatorDeviceName + "_" + deviceId;
 	}
 
 	/**
