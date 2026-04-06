@@ -471,7 +471,7 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 			}catch (NoSuchMethodError error){
 				logger.warn("Unsupported feature: getMonitoringRate isn't available on current Cloud Connector version.", error);
 			}
-			dynamicStatistics.put(DanteDomainManagerConstant.MONITORED_DEVICES_TOTAL, String.valueOf(currentSiteValue.get(DanteDomainManagerConstant.DEVICES).size()));
+			dynamicStatistics.put(DanteDomainManagerConstant.MONITORED_DEVICES_TOTAL, String.valueOf(aggregatedDeviceList.size()));
 		} catch (Exception e) {
 			logger.error("Failed to populate metadata information", e);
 		}
