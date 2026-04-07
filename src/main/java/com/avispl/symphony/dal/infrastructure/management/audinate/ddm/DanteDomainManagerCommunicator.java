@@ -351,7 +351,7 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 		reentrantLock.lock();
 		try {
 			String property = controllableProperty.getProperty();
-			String deviceId = controllableProperty.getDeviceId();
+//			String deviceId = controllableProperty.getDeviceId();
 			String value = String.valueOf(controllableProperty.getValue());
 
 			String[] propertyList = property.split(DanteDomainManagerConstant.HASH);
