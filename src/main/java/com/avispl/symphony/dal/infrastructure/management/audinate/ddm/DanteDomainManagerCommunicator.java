@@ -301,7 +301,7 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 	/**
 	 * current site value
 	 */
-	private JsonNode currentSiteValue;
+	private JsonNode currentDomainValue;
 
 	/**
 	 * Constructs a new instance of DanteDomainManagerCommunicator.
@@ -345,6 +345,28 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 	 */
 	@Override
 	public void controlProperty(ControllableProperty controllableProperty) throws Exception {
+		reentrantLock.lock();
+		try {
+			String property = controllableProperty.getProperty();
+			String deviceId = controllableProperty.getDeviceId();
+			String value = String.valueOf(controllableProperty.getValue());
+
+			String[] propertyList = property.split(DanteDomainManagerConstant.HASH);
+			String propertyName = property;
+			if (property.contains(DanteDomainManagerConstant.HASH)) {
+				propertyName = propertyList[1];
+			}
+			if (DanteDomainManagerConstant.DOMAIN_NAME.equals(propertyName)) {
+				Optional<JsonNode> matchingDomain = domainList.stream().filter(item -> item.get(DanteDomainManagerConstant.NAME).asText().equals(value)).findFirst();
+				if (matchingDomain.isPresent()) {
+					currentDomainValue = matchingDomain.get();
+				} else {
+					throw new IllegalArgumentException("Error when control DomainName");
+				}
+			}
+		} finally {
+			reentrantLock.unlock();
+		}
 	}
 
 	/**
@@ -442,7 +464,7 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 			localExtendedStatistics.getControllableProperties().clear();
 		}
 		domainList = null;
-		currentSiteValue = null;
+		currentDomainValue = null;
 		nextDevicesCollectionIterationTimestamp = 0;
 		aggregatedDeviceList.clear();
 		cachedData.clear();
@@ -531,30 +553,30 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 	 */
 	private void populateSystemInfo(Map<String, String> stats, List<AdvancedControllableProperty> advancedControllableProperties) {
 		List<String> siteNameList = domainList.stream().map(node -> node.get(DanteDomainManagerConstant.NAME).asText()).collect(Collectors.toList());
-		if (currentSiteValue == null) {
-			currentSiteValue = domainList.get(0);
+		if (currentDomainValue == null) {
+			currentDomainValue = domainList.get(0);
 		} else {
-			Optional<JsonNode> matchingDomain = domainList.stream().filter(item -> item.get(DanteDomainManagerConstant.NAME).asText().equals(currentSiteValue.get(DanteDomainManagerConstant.NAME).asText())).findFirst();
-			currentSiteValue = matchingDomain.orElse(currentSiteValue);
+			Optional<JsonNode> matchingDomain = domainList.stream().filter(item -> item.get(DanteDomainManagerConstant.NAME).asText().equals(currentDomainValue.get(DanteDomainManagerConstant.NAME).asText())).findFirst();
+			currentDomainValue = matchingDomain.orElse(currentDomainValue);
 		}
 		for (SystemInformation item : SystemInformation.values()) {
 			String propertyName = item.getName();
-			String value = getDefaultValueForNullData(currentSiteValue.get(DanteDomainManagerConstant.STATUS).get(item.getValue()).asText());
-			JsonNode message = currentSiteValue.get(DanteDomainManagerConstant.STATUS).get("domainAlertMessage").get(item.getValue());
+			String value = getDefaultValueForNullData(currentDomainValue.get(DanteDomainManagerConstant.STATUS).get(item.getValue()).asText());
+			JsonNode message = currentDomainValue.get(DanteDomainManagerConstant.STATUS).get("domainAlertMessage").get(item.getValue());
 			if (message != null && message.has(DanteDomainManagerConstant.MESSAGE)) {
 				stats.put(propertyName + "Message", message.get(DanteDomainManagerConstant.MESSAGE).asText());
 			}
 			stats.put(propertyName, value);
 		}
 		//Name
-		String name = currentSiteValue.get(DanteDomainManagerConstant.NAME).asText();
+		String name = currentDomainValue.get(DanteDomainManagerConstant.NAME).asText();
 		if (domainList.size() > 1) {
 			addAdvancedControlProperties(advancedControllableProperties, stats, createDropdown("Domains#" + DanteDomainManagerConstant.DOMAIN_NAME, siteNameList.toArray(new String[0]), name), name);
 		} else {
 			advancedControllableProperties.removeIf(item -> item.getName().equalsIgnoreCase(DanteDomainManagerConstant.DOMAIN_NAME));
 			stats.put("Domains#" + DanteDomainManagerConstant.DOMAIN_NAME, name);
 		}
-		stats.put("Domains#DomainDeviceCount", String.valueOf(currentSiteValue.get(DanteDomainManagerConstant.DEVICES).size()));
+		stats.put("Domains#DomainDeviceCount", String.valueOf(currentDomainValue.get(DanteDomainManagerConstant.DEVICES).size()));
 	}
 
 	/**
