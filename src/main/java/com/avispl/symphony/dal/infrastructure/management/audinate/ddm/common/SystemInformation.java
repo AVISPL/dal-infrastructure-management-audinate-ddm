@@ -12,10 +12,10 @@ package com.avispl.symphony.dal.infrastructure.management.audinate.ddm.common;
  * @since 1.0.0
  */
 public enum SystemInformation {
-	CLOCKING("Sites#Clocking", "clocking"),
-	CONNECTIVITY("Sites#Connectivity", "connectivity"),
-	LATENCY("Sites#Latency", "latency"),
-	SUBSCRIPTION("Sites#Subscriptions", "subscriptions"),
+	CLOCKING("Domains#Clocking", "clocking"),
+	CONNECTIVITY("Domains#Connectivity", "connectivity"),
+	LATENCY("Domains#Latency", "latency"),
+	SUBSCRIPTION("Domains#Subscriptions", "subscriptions"),
 			;
 	private final String name;
 	private final String value;
