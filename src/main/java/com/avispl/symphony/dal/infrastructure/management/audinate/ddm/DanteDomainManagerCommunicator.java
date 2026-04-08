@@ -25,6 +25,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.util.CollectionUtils;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import javax.security.auth.login.FailedLoginException;
@@ -46,6 +47,8 @@ import com.avispl.symphony.dal.infrastructure.management.audinate.ddm.common.Agg
 import com.avispl.symphony.dal.infrastructure.management.audinate.ddm.common.DanteDomainManagerConstant;
 import com.avispl.symphony.dal.infrastructure.management.audinate.ddm.common.DanteDomainManagerQuery;
 import com.avispl.symphony.dal.infrastructure.management.audinate.ddm.common.SystemInformation;
+import com.avispl.symphony.dal.infrastructure.management.audinate.ddm.dto.ReceiveChannelDTO;
+import com.avispl.symphony.dal.infrastructure.management.audinate.ddm.dto.TransmitChannelDTO;
 import com.avispl.symphony.dal.util.StringUtils;
 
 /**
@@ -704,6 +707,38 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 						addAdvancedControlProperties(advancedControllableProperties, statsControl,
 								createSwitch(propertyName, DanteDomainManagerConstant.TRUE.equals(value) ? 1 : 0, "Multicast", "Unicast"),
 								DanteDomainManagerConstant.TRUE.equals(value) ? DanteDomainManagerConstant.NUMBER_ONE : DanteDomainManagerConstant.ZERO);
+					}
+					break;
+				case RECEIVE_CHANNELS:
+					try {
+						List<ReceiveChannelDTO> channelList = objectMapper.readValue(value, new TypeReference<List<ReceiveChannelDTO>>() {
+						});
+						if (!channelList.isEmpty()) {
+							for (ReceiveChannelDTO item : channelList) {
+								String channelName = item.getName();
+									stats.put(DanteDomainManagerConstant.RECEIVE_GROUP + channelName + DanteDomainManagerConstant.HASH + "SubscribedChannel", item.getSubscribedChannel());
+									stats.put(DanteDomainManagerConstant.RECEIVE_GROUP + channelName + DanteDomainManagerConstant.HASH + "SubscribedDevice", item.getSubscribedDevice());
+									stats.put(DanteDomainManagerConstant.RECEIVE_GROUP + channelName + DanteDomainManagerConstant.HASH + "MediaType", item.getMediaType());
+									stats.put(DanteDomainManagerConstant.RECEIVE_GROUP + channelName + DanteDomainManagerConstant.HASH + "Name", item.getName());
+							}
+						}
+					} catch (Exception e) {
+						logger.error("Error occurred while retrieving receive channels", e);
+					}
+					break;
+				case TRANSMIT_CHANNELS:
+					try{
+						List<TransmitChannelDTO> txList = objectMapper.readValue(value, new TypeReference<List<TransmitChannelDTO>>() {});
+						if(!txList.isEmpty()){
+							for(TransmitChannelDTO item : txList){
+								String channelName = item.getName();
+								stats.put(DanteDomainManagerConstant.TRANSMIT_GROUP + channelName + DanteDomainManagerConstant.HASH + "Id", item.getId());
+								stats.put(DanteDomainManagerConstant.TRANSMIT_GROUP + channelName + DanteDomainManagerConstant.HASH + "Name", item.getName());
+								stats.put(DanteDomainManagerConstant.TRANSMIT_GROUP + channelName + DanteDomainManagerConstant.HASH + "MediaType", item.getMediaType());
+							}
+						}
+					} catch (Exception e) {
+						logger.error("Error occurred while retrieving transmit channels", e);
 					}
 					break;
 				default:

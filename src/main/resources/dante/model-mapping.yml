@@ -56,5 +56,7 @@ models:
         PreferredLeaderCapability: at("/capabilities/CAN_WRITE_PREFERRED_MASTER")
         UnicastClockingCapability: at("/capabilities/CAN_UNICAST_CLOCKING")
         V1DelayRequestsCapability: at("/capabilities/CAN_WRITE_UNICAST_DELAY_REQUESTS")
-
         FrequencyOffset(ppm): at("/clockingState/frequencyOffset")
+
+        ReceiveChannels: get("rxChannels")
+        TransmitChannels: get("txChannels")

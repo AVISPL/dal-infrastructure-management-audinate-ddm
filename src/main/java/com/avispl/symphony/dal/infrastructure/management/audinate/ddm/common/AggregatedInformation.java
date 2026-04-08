@@ -43,6 +43,8 @@ public enum AggregatedInformation {
 	LEADER("PreferredLeader", DanteDomainManagerConstant.CLOCK_SYNCHRONISATION_GROUP),
 	UNICAST_CLOCKING("UnicastClocking", DanteDomainManagerConstant.CLOCK_SYNCHRONISATION_GROUP),
 	DELAY_REQUEST("V1DelayRequests", DanteDomainManagerConstant.CLOCK_SYNCHRONISATION_GROUP),
+	RECEIVE_CHANNELS("ReceiveChannels", DanteDomainManagerConstant.RECEIVE_GROUP),
+	TRANSMIT_CHANNELS("TransmitChannels", DanteDomainManagerConstant.TRANSMIT_GROUP),
 	;
 	private final String name;
 	private final String group;
