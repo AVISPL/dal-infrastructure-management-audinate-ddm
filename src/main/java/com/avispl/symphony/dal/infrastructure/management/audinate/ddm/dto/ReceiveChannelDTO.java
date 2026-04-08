@@ -10,7 +10,7 @@ package com.avispl.symphony.dal.infrastructure.management.audinate.ddm.dto;
  * @author Harry / Symphony Dev Team<br>
  * @since 1.0.0
  */
-public class ChannelDTO {
+public class ReceiveChannelDTO {
 	private String name;
 	private String mediaType;
 	private String subscribedChannel;
@@ -24,7 +24,7 @@ public class ChannelDTO {
 	 * @param subscribedChannel The subscribed channel.
 	 * @param subscribedDevice The subscribed device.
 	 */
-	public ChannelDTO(String name, String mediaType, String subscribedChannel, String subscribedDevice) {
+	public ReceiveChannelDTO(String name, String mediaType, String subscribedChannel, String subscribedDevice) {
 		this.name = name;
 		this.mediaType = mediaType;
 		this.subscribedChannel = subscribedChannel;
@@ -34,7 +34,7 @@ public class ChannelDTO {
 	/**
 	 * Constructs an empty ChannelDTO.
 	 */
-	public ChannelDTO() {
+	public ReceiveChannelDTO() {
 	}
 
 	/**

@@ -32,10 +32,11 @@ public class DanteDomainManagerQuery {
 			+ "identity { productModelName productVersion danteHardwareVersion productSoftwareVersion danteVersion } "
 			+ "manufacturer { name } "
 			+ "interfaces { address macAddress subnet netmask} "
-			+ "capabilities { CAN_WRITE_UNICAST_DELAY_REQUESTS  CAN_WRITE_PREFERRED_MASTER  CAN_WRITE_EXT_WORD_CLOCK  CAN_UNICAST_CLOCKING   } "
+			+ "capabilities { CAN_WRITE_UNICAST_DELAY_REQUESTS CAN_WRITE_PREFERRED_MASTER CAN_WRITE_EXT_WORD_CLOCK CAN_UNICAST_CLOCKING } "
 			+ "status { clocking connectivity latency subscriptions summary "
 			+ "alertMessage { clocking  connectivity  latency  subscriptions }}  "
-			+ "rxChannels { mediaType  name  subscribedChannel  subscribedDevice  } "
+			+ "rxChannels { mediaType name subscribedChannel subscribedDevice } "
+			+ "txChannels { id index name mediaType } "
 			+ "clockingState { followerWithoutLeader frequencyOffset grandLeader locked multicastLeader muteStatus unicastFollower unicastLeader } "
 			+ "clockPreferences { externalWordClock leader unicastClocking v1UnicastDelayRequests } } } }\"}";
 
