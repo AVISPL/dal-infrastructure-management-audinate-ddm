@@ -52,3 +52,4 @@ models:
         FrequencyOffset(ppm): get("clockingState")?.get("frequencyOffset")
 
         ReceiveChannels: get("rxChannels")
+        TransmitChannels: get("txChannels")

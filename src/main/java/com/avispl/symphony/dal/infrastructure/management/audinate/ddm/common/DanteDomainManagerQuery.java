@@ -40,6 +40,20 @@ public class DanteDomainManagerQuery {
 			+ "clockingState { followerWithoutLeader frequencyOffset grandLeader locked multicastLeader muteStatus unicastFollower unicastLeader } "
 			+ "clockPreferences { externalWordClock leader unicastClocking v1UnicastDelayRequests } } } }\"}";
 
+	public static final String ADD_DOMAIN = "{\"query\":\"mutation AddDomain($input: DomainAddInput!) "
+			+ "{ DomainAdd(input: $input) "
+			+ "{ ok domain { id name icon } } }\","
+			+ "\"variables\": {"
+			+ "\"input\" : "
+			+ "{\"name\":\"%s\", \"icon\":\"%s\"}}}";
+
+	public static final String DOMAIN_UPDATE = "{\"query\":\"mutation DomainUpdate($input: DomainUpdateInput!) "
+			+ "{ DomainUpdate(input: $input) "
+			+ "{ ok domain { id name icon } } }\","
+			+ "\"variables\": {"
+			+ "\"input\" : "
+			+ "{\"id\":\"%s\", \"name\":\"%s\", \"icon\":\"%s\"}}}";
+
 	public static final String CONTROL_CLOCK_SYNC = "{\"query\":\"mutation ControlCommand($input: %s!) "
 			+ "{ %s(input: $input) "
 			+ "{ ok } }\","

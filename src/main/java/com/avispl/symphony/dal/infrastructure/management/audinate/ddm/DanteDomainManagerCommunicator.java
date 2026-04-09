@@ -50,6 +50,7 @@ import com.avispl.symphony.dal.infrastructure.management.audinate.ddm.common.Sys
 import com.avispl.symphony.dal.infrastructure.management.audinate.ddm.dto.ReceiveChannelDTO;
 import com.avispl.symphony.dal.infrastructure.management.audinate.ddm.dto.TransmitChannelDTO;
 import com.avispl.symphony.dal.util.StringUtils;
+import static com.avispl.symphony.dal.util.ControllablePropertyFactory.*;
 
 /**
  * DanteDomainManagerCommunicator
@@ -59,8 +60,8 @@ import com.avispl.symphony.dal.util.StringUtils;
  *  <li> - Clocking</li>
  *  <li> - Connectivity</li>
  *  <li> - Latency</li>
- *  <li> - NumberOfDevices</li>
- *  <li> - SiteName</li>
+ *  <li> - DomainDeviceCount</li>
+ *  <li> - DomainName</li>
  *  <li> - Subscriptions</li>
  *  <ul>
  *
@@ -83,7 +84,7 @@ import com.avispl.symphony.dal.util.StringUtils;
  * <li> - MACAddress</li>
  * <li> - Manufacturer</li>
  * <li> - ProductVersion</li>
- * <li> - Site</li>
+ * <li> - Domain</li>
  * </ul>
  *
  * ClockSynchronisation Group:
@@ -302,9 +303,14 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 	private List<AggregatedDevice> cachedData = Collections.synchronizedList(new ArrayList<>());
 
 	/**
-	 * current site value
+	 * current domain value
 	 */
 	private JsonNode currentDomainValue;
+
+	/**
+	 * current domain id
+	 * */
+	private String currentDomainId = DanteDomainManagerConstant.EMPTY;
 
 	/**
 	 * Constructs a new instance of DanteDomainManagerCommunicator.
@@ -366,6 +372,9 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 				} else {
 					throw new IllegalArgumentException("Error when control DomainName");
 				}
+			} else if(DanteDomainManagerConstant.UPDATE_DOMAIN_NAME.equals(propertyName)){
+				sendCommandToRenameDomain(currentDomainId, value);
+				currentDomainValue = null;
 			}
 		} finally {
 			reentrantLock.unlock();
@@ -573,12 +582,14 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 		}
 		//Name
 		String name = currentDomainValue.get(DanteDomainManagerConstant.NAME).asText();
+		currentDomainId = currentDomainValue.get(DanteDomainManagerConstant.ID).asText();
 		if (domainList.size() > 1) {
 			addAdvancedControlProperties(advancedControllableProperties, stats, createDropdown("Domains#" + DanteDomainManagerConstant.DOMAIN_NAME, siteNameList.toArray(new String[0]), name), name);
 		} else {
 			advancedControllableProperties.removeIf(item -> item.getName().equalsIgnoreCase(DanteDomainManagerConstant.DOMAIN_NAME));
 			stats.put("Domains#" + DanteDomainManagerConstant.DOMAIN_NAME, name);
 		}
+		addAdvancedControlProperties(advancedControllableProperties, stats, createText("Domains#" + DanteDomainManagerConstant.UPDATE_DOMAIN_NAME, name), DanteDomainManagerConstant.NOT_AVAILABLE );
 		stats.put("Domains#DomainDeviceCount", String.valueOf(currentDomainValue.get(DanteDomainManagerConstant.DEVICES).size()));
 	}
 
@@ -868,6 +879,29 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 		dropDown.setLabels(values);
 
 		return new AdvancedControllableProperty(name, new Date(), dropDown, initialValue);
+	}
+
+	/**
+	 * Sends a command to rename a domain by its ID.
+	 *
+	 * @param id   the unique identifier of the domain
+	 * @param name the new name of the domain
+	 * @throws IllegalArgumentException if the request fails or returns an error
+	 */
+	private void sendCommandToRenameDomain(String id, String name) {
+		try {
+			String command = String.format(DanteDomainManagerQuery.DOMAIN_UPDATE, id, name, "OFFICE");
+			JsonNode response = this.doPost(DanteDomainManagerConstant.URL, command, JsonNode.class);
+
+			if (response.has(DanteDomainManagerConstant.ERRORS)) {
+				String errMessage = response.get(DanteDomainManagerConstant.ERRORS).get(0).get(DanteDomainManagerConstant.MESSAGE).asText();
+				throw new IllegalArgumentException(errMessage);
+			}
+
+		} catch (Exception e) {
+			throw new IllegalArgumentException(
+					String.format("Can't rename domain with id %s. %s", id, e.getMessage()));
+		}
 	}
 
 	/**
