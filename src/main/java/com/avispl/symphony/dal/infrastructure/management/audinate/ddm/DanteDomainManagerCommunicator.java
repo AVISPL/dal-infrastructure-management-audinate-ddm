@@ -301,11 +301,6 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 	private List<AggregatedDevice> cachedData = Collections.synchronizedList(new ArrayList<>());
 
 	/**
-	 * current domain id
-	 * */
-	private String currentDomainId = DanteDomainManagerConstant.EMPTY;
-
-	/**
 	 * Constructs a new instance of DanteDomainManagerCommunicator.
 	 *
 	 * @throws IOException If an I/O error occurs while loading the properties mapping YAML file.
