@@ -25,15 +25,12 @@ public class DanteDomainManagerConstant {
 	public static final String NUMBER_ONE = "1";
 	public static final String ZERO = "0";
 	public static final String CLOCK_SYNCHRONISATION_GROUP = "ClockSynchronisation#";
-	public static final String CLOCK_PREFERENCE_GROUP = "ClockPreferences#";
 	public static final String STATUS_GROUP = "Status#";
-	public static final String RECEIVE_CHANNEL_GROUP = "ReceiveChannels#";
 	public static final String RECEIVE_GROUP = "Receive_";
 	public static final String TRANSMIT_GROUP = "Transmit_";
 	public static final String DEFAULT_FORMAT_DATETIME = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'";
 	public static final String TARGET_FORMAT_DATETIME = "MMM d, yyyy, h:mm a";
-	public static final String DOMAIN_NAME = "DomainName";
-	public static final String UPDATE_DOMAIN_NAME = "UpdateDomainName";
+	public static final String DOMAIN_NAME = "Name";
 	public static final String CAPABILITY = "Capability";
 	public static final String ERRORS = "errors";
 	public static final String DATA = "data";
