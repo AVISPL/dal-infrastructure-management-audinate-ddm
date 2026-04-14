@@ -12,7 +12,6 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Properties;
 import java.util.TimeZone;
 import java.util.concurrent.ExecutorService;
@@ -59,8 +58,8 @@ import com.avispl.symphony.dal.util.StringUtils;
  *  <li> - Clocking</li>
  *  <li> - Connectivity</li>
  *  <li> - Latency</li>
- *  <li> - NumberOfDevices</li>
- *  <li> - SiteName</li>
+ *  <li> - DomainDeviceCount</li>
+ *  <li> - DomainName</li>
  *  <li> - Subscriptions</li>
  *  <ul>
  *
@@ -83,7 +82,7 @@ import com.avispl.symphony.dal.util.StringUtils;
  * <li> - MACAddress</li>
  * <li> - Manufacturer</li>
  * <li> - ProductVersion</li>
- * <li> - Site</li>
+ * <li> - Domain</li>
  * </ul>
  *
  * ClockSynchronisation Group:
@@ -302,11 +301,6 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 	private List<AggregatedDevice> cachedData = Collections.synchronizedList(new ArrayList<>());
 
 	/**
-	 * current site value
-	 */
-	private JsonNode currentDomainValue;
-
-	/**
 	 * Constructs a new instance of DanteDomainManagerCommunicator.
 	 *
 	 * @throws IOException If an I/O error occurs while loading the properties mapping YAML file.
@@ -328,14 +322,12 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 		try {
 			Map<String, String> statistics = new HashMap<>();
 			Map<String, String> dynamicStatistics = new HashMap<>();
-			List<AdvancedControllableProperty> advancedControllableProperties = new ArrayList<>();
 			ExtendedStatistics extendedStatistics = new ExtendedStatistics();
 			retrieveMetadata(statistics, dynamicStatistics);
 			retrieveSystemInfo();
-			populateSystemInfo(statistics, advancedControllableProperties);
+			populateDomainInfo(statistics);
 			extendedStatistics.setStatistics(statistics);
 			extendedStatistics.setDynamicStatistics(dynamicStatistics);
-			extendedStatistics.setControllableProperties(advancedControllableProperties);
 			localExtendedStatistics = extendedStatistics;
 		} finally {
 			reentrantLock.unlock();
@@ -348,28 +340,6 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 	 */
 	@Override
 	public void controlProperty(ControllableProperty controllableProperty) throws Exception {
-		reentrantLock.lock();
-		try {
-			String property = controllableProperty.getProperty();
-//			String deviceId = controllableProperty.getDeviceId();
-			String value = String.valueOf(controllableProperty.getValue());
-
-			String[] propertyList = property.split(DanteDomainManagerConstant.HASH);
-			String propertyName = property;
-			if (property.contains(DanteDomainManagerConstant.HASH)) {
-				propertyName = propertyList[1];
-			}
-			if (DanteDomainManagerConstant.DOMAIN_NAME.equals(propertyName)) {
-				Optional<JsonNode> matchingDomain = domainList.stream().filter(item -> item.get(DanteDomainManagerConstant.NAME).asText().equals(value)).findFirst();
-				if (matchingDomain.isPresent()) {
-					currentDomainValue = matchingDomain.get();
-				} else {
-					throw new IllegalArgumentException("Error when control DomainName");
-				}
-			}
-		} finally {
-			reentrantLock.unlock();
-		}
 	}
 
 	/**
@@ -467,7 +437,6 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 			localExtendedStatistics.getControllableProperties().clear();
 		}
 		domainList = null;
-		currentDomainValue = null;
 		nextDevicesCollectionIterationTimestamp = 0;
 		aggregatedDeviceList.clear();
 		cachedData.clear();
@@ -552,34 +521,33 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 	 * System information includes properties from the {@link SystemInformation} enumeration.
 	 *
 	 * @param stats The map to store system information properties.
-	 * @param advancedControllableProperties The list to store advanced controllable properties.
 	 */
-	private void populateSystemInfo(Map<String, String> stats, List<AdvancedControllableProperty> advancedControllableProperties) {
-		List<String> siteNameList = domainList.stream().map(node -> node.get(DanteDomainManagerConstant.NAME).asText()).collect(Collectors.toList());
-		if (currentDomainValue == null) {
-			currentDomainValue = domainList.get(0);
-		} else {
-			Optional<JsonNode> matchingDomain = domainList.stream().filter(item -> item.get(DanteDomainManagerConstant.NAME).asText().equals(currentDomainValue.get(DanteDomainManagerConstant.NAME).asText())).findFirst();
-			currentDomainValue = matchingDomain.orElse(currentDomainValue);
-		}
-		for (SystemInformation item : SystemInformation.values()) {
-			String propertyName = item.getName();
-			String value = getDefaultValueForNullData(currentDomainValue.get(DanteDomainManagerConstant.STATUS).get(item.getValue()).asText());
-			JsonNode message = currentDomainValue.get(DanteDomainManagerConstant.STATUS).get("domainAlertMessage").get(item.getValue());
-			if (message != null && message.has(DanteDomainManagerConstant.MESSAGE)) {
-				stats.put(propertyName + "Message", message.get(DanteDomainManagerConstant.MESSAGE).asText());
+	private void populateDomainInfo(Map<String, String> stats) {
+
+		for (JsonNode domain : domainList) {
+
+			String domainName = domain.get(DanteDomainManagerConstant.NAME).asText();
+			JsonNode statusNode = domain.get(DanteDomainManagerConstant.STATUS);
+			JsonNode alertNode = statusNode.get("domainAlertMessage");
+
+			String groupDomain = sanitizeGroup(SystemInformation.values()[0].getGroup() + "_" + domainName);
+
+			stats.put(groupDomain + DanteDomainManagerConstant.HASH + DanteDomainManagerConstant.DOMAIN_NAME, domainName);
+			stats.put(groupDomain + DanteDomainManagerConstant.HASH + "DomainDeviceCount", String.valueOf(domain.get(DanteDomainManagerConstant.DEVICES).size()));
+
+			for (SystemInformation item : SystemInformation.values()) {
+				String propertyName = item.getName();
+				String key = groupDomain + DanteDomainManagerConstant.HASH + propertyName;
+				String value = getDefaultValueForNullData(statusNode.get(item.getValue()).asText());
+
+				if (alertNode != null) {
+					JsonNode message = alertNode.get(item.getValue());
+					if (message != null && message.has(DanteDomainManagerConstant.MESSAGE)) {
+						stats.put(propertyName + "Message", message.get(DanteDomainManagerConstant.MESSAGE).asText());}
+				}
+				stats.put(key, value);
 			}
-			stats.put(propertyName, value);
 		}
-		//Name
-		String name = currentDomainValue.get(DanteDomainManagerConstant.NAME).asText();
-		if (domainList.size() > 1) {
-			addAdvancedControlProperties(advancedControllableProperties, stats, createDropdown("Domains#" + DanteDomainManagerConstant.DOMAIN_NAME, siteNameList.toArray(new String[0]), name), name);
-		} else {
-			advancedControllableProperties.removeIf(item -> item.getName().equalsIgnoreCase(DanteDomainManagerConstant.DOMAIN_NAME));
-			stats.put("Domains#" + DanteDomainManagerConstant.DOMAIN_NAME, name);
-		}
-		stats.put("Domains#DomainDeviceCount", String.valueOf(currentDomainValue.get(DanteDomainManagerConstant.DEVICES).size()));
 	}
 
 	/**
@@ -749,7 +717,7 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 						if(!txList.isEmpty()){
 							for(TransmitChannelDTO item : txList){
 								String channelName = item.getName();
-								stats.put(DanteDomainManagerConstant.TRANSMIT_GROUP + channelName + DanteDomainManagerConstant.HASH + "Id", item.getId());
+								stats.put(DanteDomainManagerConstant.TRANSMIT_GROUP + channelName + DanteDomainManagerConstant.HASH + "ID", item.getId());
 								stats.put(DanteDomainManagerConstant.TRANSMIT_GROUP + channelName + DanteDomainManagerConstant.HASH + "Name", item.getName());
 								stats.put(DanteDomainManagerConstant.TRANSMIT_GROUP + channelName + DanteDomainManagerConstant.HASH + "MediaType", item.getMediaType());
 							}
@@ -854,20 +822,16 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 		return advancedControllableProperty;
 	}
 
-	/***
-	 * Create dropdown advanced controllable property
+	/**
+	 * Sanitizes a string to be used as a group key by replacing non-alphanumeric
+	 * characters (except dots) with underscores and trimming leading/trailing underscores.
 	 *
-	 * @param name the name of the control
-	 * @param values  The array of values for the dropdown options.
-	 * @param initialValue initial value of the control
-	 * @return AdvancedControllableProperty dropdown instance
+	 * @param input the raw group name
+	 * @return a sanitized string suitable for use as a group identifier
 	 */
-	private AdvancedControllableProperty createDropdown(String name, String[] values, String initialValue) {
-		AdvancedControllableProperty.DropDown dropDown = new AdvancedControllableProperty.DropDown();
-		dropDown.setOptions(values);
-		dropDown.setLabels(values);
-
-		return new AdvancedControllableProperty(name, new Date(), dropDown, initialValue);
+	private String sanitizeGroup(String input) {
+		return input.replaceAll("[^a-zA-Z0-9.]+", "_")
+				.replaceAll("^_|_$", "");
 	}
 
 	/**
