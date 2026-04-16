@@ -830,7 +830,7 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 	 * @return a sanitized string suitable for use as a group identifier
 	 */
 	private String sanitizeGroup(String input) {
-		return input.replaceAll("[^a-zA-Z0-9.]+", "_")
+		return input.replaceAll("[^a-zA-Z0-9.\\/-]+", "_")
 				.replaceAll("^_|_$", "");
 	}
 
