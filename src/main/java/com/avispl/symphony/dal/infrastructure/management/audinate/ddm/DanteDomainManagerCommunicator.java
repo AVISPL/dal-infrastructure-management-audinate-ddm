@@ -300,6 +300,26 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 	 */
 	private List<AggregatedDevice> cachedData = Collections.synchronizedList(new ArrayList<>());
 
+	private String domainNameFiltering = "";
+
+	/**
+	 * Retrieves {@link #domainNameFiltering}
+	 *
+	 * @return value of {@link #domainNameFiltering}
+	 */
+	public String getDomainNameFiltering() {
+		return domainNameFiltering;
+	}
+
+	/**
+	 * Sets {@link #domainNameFiltering} value
+	 *
+	 * @param domainNameFiltering new value of {@link #domainNameFiltering}
+	 */
+	public void setDomainNameFiltering(String domainNameFiltering) {
+		this.domainNameFiltering = domainNameFiltering;
+	}
+
 	/**
 	 * Constructs a new instance of DanteDomainManagerCommunicator.
 	 *
@@ -557,26 +577,68 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 	 */
 	private void populateDeviceDetails() {
 		try {
-			JsonNode response = this.doPost(DanteDomainManagerConstant.URL, DanteDomainManagerQuery.DEVICES_INFO, JsonNode.class);
-			if (response.has(DanteDomainManagerConstant.DATA) && response.get(DanteDomainManagerConstant.DATA).has(DanteDomainManagerConstant.DOMAINS)) {
-				cachedData.clear();
-				for (JsonNode domainNode : response.get(DanteDomainManagerConstant.DATA).get(DanteDomainManagerConstant.DOMAINS)) {
+			JsonNode response = fetchDeviceResponse();
+			if (response == null || !response.has(DanteDomainManagerConstant.DATA)) {
+				return;
+			}
+			cachedData.clear();
+			JsonNode dataNode = response.get(DanteDomainManagerConstant.DATA);
+
+			if (dataNode.has("domain")) {
+				processDevices(dataNode.get("domain"));
+			}	else if (dataNode.has(DanteDomainManagerConstant.DOMAINS)) {
+				for (JsonNode domainNode : dataNode.get(DanteDomainManagerConstant.DOMAINS)) {
 					String domainId = domainNode.get(DanteDomainManagerConstant.ID).asText();
 					if (checkExistDomainId(domainId)) {
-						JsonNode jsonArray = domainNode.get(DanteDomainManagerConstant.DEVICES);
-						for (JsonNode jsonNode : jsonArray) {
-							JsonNode node = objectMapper.createArrayNode().add(jsonNode);
-
-							String id = jsonNode.get(DanteDomainManagerConstant.ID).asText();
-							cachedData.removeIf(item -> item.getDeviceId().equals(id));
-							cachedData.addAll(aggregatedDeviceProcessor.extractDevices(node));
-						}
+						processDevices(domainNode);
 					}
 				}
 			}
 		} catch (Exception e) {
 			logger.error("An error occurred during aggregated device information request.", e);
 		}
+	}
+
+	/**
+	 * Processes devices within a given domain node and updates the cached data.
+	 * Each device is extracted and transformed using {@link #aggregatedDeviceProcessor},
+	 * replacing any existing entries with the same device ID.
+	 *
+	 * @param domainNode the JSON node containing device information for a domain
+	 */
+	private void processDevices(JsonNode domainNode) {
+		JsonNode devices = domainNode.get(DanteDomainManagerConstant.DEVICES);
+		if (devices == null || !devices.isArray()) {
+			return;
+		}
+		for (JsonNode device : devices) {
+			JsonNode node = objectMapper.createArrayNode().add(device);
+			String deviceId = device.get(DanteDomainManagerConstant.ID).asText();
+			cachedData.removeIf(item -> item.getDeviceId().equals(deviceId));
+			cachedData.addAll(aggregatedDeviceProcessor.extractDevices(node));
+		}
+	}
+
+	/**
+	 * Fetches device information from the API based on the current domain filter.
+	 * If {@link #domainNameFiltering} is provided, it resolves the corresponding domain ID
+	 * and retrieves devices for that specific domain. Otherwise, it retrieves devices
+	 * across all domains.
+	 * @throws Exception if an error occurs during the API request
+	 */
+	private JsonNode fetchDeviceResponse() throws Exception {
+		String command;
+		if (StringUtils.isNotNullOrEmpty(domainNameFiltering)) {
+			String domainId = getDomainIdByName(domainNameFiltering);
+			if (domainId == null) {
+				logger.warn(String.format("Domain name '%s' not found", domainNameFiltering));
+				return null;
+			}
+			command = String.format(DanteDomainManagerQuery.DEVICES_BY_DOMAIN_ID, domainId);
+		} else {
+			command = DanteDomainManagerQuery.DEVICES_INFO;
+		}
+		return this.doPost(DanteDomainManagerConstant.URL, command, JsonNode.class);
 	}
 
 	/**
@@ -832,6 +894,25 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 	private String sanitizeGroup(String input) {
 		return input.replaceAll("[^a-zA-Z0-9.]+", "_")
 				.replaceAll("^_|_$", "");
+	}
+
+	/**
+	 * Resolves the domain ID corresponding to the given domain name.
+	 * Performs a case-insensitive match against the available domain list.
+	 *
+	 * @param domainName the name of the domain to look up
+	 * @return the matching domain ID, or {@code null} if no match is found
+	 */
+	private String getDomainIdByName(String domainName) {
+		if (domainName == null || domainName.isEmpty()) {
+			return null;
+		}
+		return domainList.stream()
+				.filter(domain -> domainName.equalsIgnoreCase(
+						domain.get(DanteDomainManagerConstant.NAME).asText()))
+				.map(domain -> domain.get(DanteDomainManagerConstant.ID).asText())
+				.findFirst()
+				.orElse(null);
 	}
 
 	/**

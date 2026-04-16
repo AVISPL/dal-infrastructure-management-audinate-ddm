@@ -27,7 +27,7 @@ models:
         Location: get("location")
         Description: get("description")
         Comments: get("comments")
-        Site: at("/domain/name")
+        Domain: at("/domain/name")
 
         DiscoveryType: at("/discovery/type")
         DiscoveryDomainName: at("/discovery/fqdn")
