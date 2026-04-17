@@ -501,19 +501,28 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 	private void retrieveSystemInfo() throws Exception {
 		JsonNode response = this.doPost(DanteDomainManagerConstant.URL, DanteDomainManagerQuery.SYSTEM_INFO, JsonNode.class);
 
-		if (response.has(DanteDomainManagerConstant.ERRORS) && checkUnauthenticated(response.get(DanteDomainManagerConstant.ERRORS))) {
+		if (response == null) {
+			throw new RuntimeException("System info response is null.");
+		}
+		JsonNode errors = response.get(DanteDomainManagerConstant.ERRORS);
+		if (errors != null && checkUnauthenticated(errors)) {
 			throw new FailedLoginException("Unable to login. Please check the credentials");
 		}
 
-		if (!response.has(DanteDomainManagerConstant.DATA) || !response.get(DanteDomainManagerConstant.DATA).has(DanteDomainManagerConstant.DOMAINS)) {
+		JsonNode dataNode = response.get(DanteDomainManagerConstant.DATA);
+		if (dataNode == null) {
+			throw new RuntimeException("Missing 'data' in system info response.");
+		}
+		JsonNode domainsNode = dataNode.get(DanteDomainManagerConstant.DOMAINS);
+		if (domainsNode == null || !domainsNode.isArray()) {
 			throw new RuntimeException("An error occurred during system information request.");
 		}
-
-		if (response.get(DanteDomainManagerConstant.DATA).get(DanteDomainManagerConstant.DOMAINS).isEmpty()) {
+		if (domainsNode.isEmpty()) {
 			throw new RuntimeException("No domains found for the current account.");
-		} else {
+		}
+		synchronized (domainList) {
 			domainList.clear();
-			for (JsonNode item : response.get(DanteDomainManagerConstant.DATA).get(DanteDomainManagerConstant.DOMAINS)) {
+			for (JsonNode item : domainsNode) {
 				domainList.add(item);
 			}
 		}
@@ -907,7 +916,11 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 		if (domainName == null || domainName.isEmpty()) {
 			return null;
 		}
-		return domainList.stream()
+		List<JsonNode> domainCurrent;
+		synchronized (domainList) {
+			domainCurrent = new ArrayList<>(domainList);
+		}
+		return domainCurrent.stream()
 				.filter(domain -> domainName.equalsIgnoreCase(
 						domain.get(DanteDomainManagerConstant.NAME).asText()))
 				.map(domain -> domain.get(DanteDomainManagerConstant.ID).asText())
