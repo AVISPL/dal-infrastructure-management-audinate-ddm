@@ -876,12 +876,10 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 					stats.put(propertyName, newValue);
 					break;
 				case LEADER:
-					if(!"SMPTE".equals(domainMode)){
-						if (DanteDomainManagerConstant.TRUE.equals(getDefaultValueForNullData(cachedValue.get(name + DanteDomainManagerConstant.CAPABILITY)))) {
-							addAdvancedControlProperties(advancedControllableProperties, statsControl,
-									createSwitch(propertyName, DanteDomainManagerConstant.TRUE.equals(value) ? 1 : 0, DanteDomainManagerConstant.OFF, DanteDomainManagerConstant.ON),
-									DanteDomainManagerConstant.TRUE.equals(value) ? DanteDomainManagerConstant.NUMBER_ONE : DanteDomainManagerConstant.ZERO);
-						}
+					if(!"SMPTE".equals(domainMode) && DanteDomainManagerConstant.TRUE.equals(getDefaultValueForNullData(cachedValue.get(name + DanteDomainManagerConstant.CAPABILITY)))){
+						addAdvancedControlProperties(advancedControllableProperties, statsControl,
+								createSwitch(propertyName, DanteDomainManagerConstant.TRUE.equals(value) ? 1 : 0, DanteDomainManagerConstant.OFF, DanteDomainManagerConstant.ON),
+								DanteDomainManagerConstant.TRUE.equals(value) ? DanteDomainManagerConstant.NUMBER_ONE : DanteDomainManagerConstant.ZERO);
 					}
 					break;
 				case PTP_PRIORITY1:
