@@ -25,6 +25,9 @@ models:
         Description: get("description")
         Comments: get("comments")
         Domain: get("domain")?.get("name")
+        DomainMode: at("/domain/clockingGroup/mode")
+        DomainPTPV2Priority1: at("/domain/clockingGroup/ptp/v2Priority1")
+        DomainPTPV2Priority2: at("/domain/clockingGroup/ptp/v2Priority2")
 
         DiscoveryType: get("discovery")?.get("type")
         DiscoveryDomainName: get("discovery")?.get("fqdn")
@@ -45,6 +48,9 @@ models:
         PreferredLeader: get("clockPreferences")?.get("leader")
         UnicastClocking: get("clockPreferences")?.get("unicastClocking")
         V1DelayRequests: get("clockPreferences")?.get("v1UnicastDelayRequests")
+        PTPV2Priority1: at("/clockPreferences/overrides/ptp/v2")
+        PTPV2Priority2: at("/clockPreferences/overrides/ptp/v2Priority2")
+
         SyncToExternalWordClockCapability: get("capabilities")?.get("CAN_WRITE_EXT_WORD_CLOCK")
         PreferredLeaderCapability: get("capabilities")?.get("CAN_WRITE_PREFERRED_MASTER")
         UnicastClockingCapability: get("capabilities")?.get("CAN_UNICAST_CLOCKING")

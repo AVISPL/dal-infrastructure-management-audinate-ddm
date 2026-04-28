@@ -12,21 +12,28 @@ package com.avispl.symphony.dal.infrastructure.management.audinate.ddm.common;
  */
 public class DanteDomainManagerQuery {
 	public static final String SYSTEM_INFO = "{\"query\":\"query Domains "
-			+ "{ domains {    "
-			+ "name    id  "
-			+ "devices { id }   "
-			+ "status { clocking  connectivity  latency  subscriptions summary "
-			+ "domainAlertMessage {  "
-			+ "clocking { message  messageSeverity }  "
-			+ "connectivity { message  messageSeverity }  "
-			+ "latency { message  messageSeverity }  "
-			+ "subscriptions { message  messageSeverity } } }   } }\"}";
+			+ "{ domains { "
+			+ "name id "
+			+ "devices { id } "
+			+ "clockingGroup { "
+			+ "mode "
+			+ "ptp { v2 v2Priority1 v2Priority2 v2DomainNumber } "
+			+ "rtp { prefixV4 rxLatency systemPacketTime transmitPort } "
+			+ "} "
+			+ "status { clocking connectivity latency subscriptions summary "
+			+ "domainAlertMessage { "
+			+ "clocking { message messageSeverity } "
+			+ "connectivity { message messageSeverity } "
+			+ "latency { message messageSeverity } "
+			+ "subscriptions { message messageSeverity } "
+			+ "} } "
+			+ "} }\"}";
 
 	public static final String DEVICES_INFO = "{\"query\":\"query Devices "
 			+ "{ domains {  id name "
 			+ "devices { "
 			+ "id  name  enrolmentState  comments description  location "
-			+ "domain { name } "
+			+ "domain { name clockingGroup { mode ptp { v2 v2Priority1 v2Priority2 } } } "
 			+ "connection { state lastChanged }  "
 			+ "discovery { type fqdn } "
 			+ "identity { productModelName productVersion danteHardwareVersion productSoftwareVersion danteVersion } "
@@ -38,13 +45,14 @@ public class DanteDomainManagerQuery {
 			+ "rxChannels { mediaType name subscribedChannel subscribedDevice } "
 			+ "txChannels { id index name mediaType } "
 			+ "clockingState { followerWithoutLeader frequencyOffset grandLeader locked multicastLeader muteStatus unicastFollower unicastLeader } "
-			+ "clockPreferences { externalWordClock leader unicastClocking v1UnicastDelayRequests } } } }\"}";
+			+ "clockPreferences { externalWordClock leader unicastClocking v1UnicastDelayRequests overrides { ptp { v2Priority1 v2Priority2 } } } "
+			+ "} } }\"}";
 
 	public static final String DEVICES_BY_DOMAIN_ID = "{\"query\":\"query Devices($domainId: ID!) "
 			+ "{ domain(id: $domainId) { id name "
 			+ "devices { "
 			+ "id name enrolmentState comments description location "
-			+ "domain { name } "
+			+ "domain { name clockingGroup { mode ptp { v2 v2Priority1 v2Priority2 } } } "
 			+ "connection { state lastChanged } "
 			+ "discovery { type fqdn } "
 			+ "identity { productModelName productVersion danteHardwareVersion productSoftwareVersion danteVersion } "
@@ -56,7 +64,7 @@ public class DanteDomainManagerQuery {
 			+ "rxChannels { mediaType name subscribedChannel subscribedDevice } "
 			+ "txChannels { id index name mediaType } "
 			+ "clockingState { followerWithoutLeader frequencyOffset grandLeader locked multicastLeader muteStatus unicastFollower unicastLeader } "
-			+ "clockPreferences { externalWordClock leader unicastClocking v1UnicastDelayRequests } "
+			+ "clockPreferences { externalWordClock leader unicastClocking v1UnicastDelayRequests overrides { ptp { v2Priority1 v2Priority2 } } } "
 			+ "} } }\","
 			+ "\"variables\": {\"domainId\": \"%s\"}}";
 
