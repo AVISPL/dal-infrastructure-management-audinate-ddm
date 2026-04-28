@@ -7,11 +7,13 @@ package com.avispl.symphony.dal.infrastructure.management.audinate.ddm;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.TimeZone;
 import java.util.concurrent.ExecutorService;
@@ -42,13 +44,16 @@ import com.avispl.symphony.dal.aggregator.parser.AggregatedDeviceProcessor;
 import com.avispl.symphony.dal.aggregator.parser.PropertiesMapping;
 import com.avispl.symphony.dal.aggregator.parser.PropertiesMappingParser;
 import com.avispl.symphony.dal.communicator.RestCommunicator;
+import com.avispl.symphony.dal.infrastructure.management.audinate.ddm.common.AggregatedControllableProperty;
 import com.avispl.symphony.dal.infrastructure.management.audinate.ddm.common.AggregatedInformation;
+import com.avispl.symphony.dal.infrastructure.management.audinate.ddm.common.ClockingGroupInfo;
 import com.avispl.symphony.dal.infrastructure.management.audinate.ddm.common.DanteDomainManagerConstant;
 import com.avispl.symphony.dal.infrastructure.management.audinate.ddm.common.DanteDomainManagerQuery;
 import com.avispl.symphony.dal.infrastructure.management.audinate.ddm.common.SystemInformation;
 import com.avispl.symphony.dal.infrastructure.management.audinate.ddm.dto.ReceiveChannelDTO;
 import com.avispl.symphony.dal.infrastructure.management.audinate.ddm.dto.TransmitChannelDTO;
 import com.avispl.symphony.dal.util.StringUtils;
+import static com.avispl.symphony.dal.util.ControllablePropertyFactory.*;
 
 /**
  * DanteDomainManagerCommunicator
@@ -300,24 +305,24 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 	 */
 	private List<AggregatedDevice> cachedData = Collections.synchronizedList(new ArrayList<>());
 
-	private String domainNameFiltering = "";
+	private String domainNameFilter = "";
 
 	/**
-	 * Retrieves {@link #domainNameFiltering}
+	 * Retrieves {@link #domainNameFilter}
 	 *
-	 * @return value of {@link #domainNameFiltering}
+	 * @return value of {@link #domainNameFilter}
 	 */
-	public String getDomainNameFiltering() {
-		return domainNameFiltering;
+	public String getDomainNameFilter() {
+		return domainNameFilter;
 	}
 
 	/**
-	 * Sets {@link #domainNameFiltering} value
+	 * Sets {@link #domainNameFilter} value
 	 *
-	 * @param domainNameFiltering new value of {@link #domainNameFiltering}
+	 * @param domainNameFilter new value of {@link #domainNameFilter}
 	 */
-	public void setDomainNameFiltering(String domainNameFiltering) {
-		this.domainNameFiltering = domainNameFiltering;
+	public void setDomainNameFilter(String domainNameFilter) {
+		this.domainNameFilter = domainNameFilter;
 	}
 
 	/**
@@ -360,6 +365,47 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 	 */
 	@Override
 	public void controlProperty(ControllableProperty controllableProperty) throws Exception {
+		reentrantLock.lock();
+		try {
+			String property = controllableProperty.getProperty();
+			String deviceId = controllableProperty.getDeviceId();
+			String value = String.valueOf(controllableProperty.getValue());
+
+			String[] propertyList = property.split(DanteDomainManagerConstant.HASH);
+			String propertyName = property;
+			if (property.contains(DanteDomainManagerConstant.HASH)) {
+				propertyName = propertyList[1];
+			}
+			Optional<AggregatedDevice> aggregatedDevice = aggregatedDeviceList.stream().filter(item -> item.getDeviceId().equals(deviceId)).findFirst();
+			if (aggregatedDevice.isPresent()) {
+				AggregatedInformation item = AggregatedInformation.getByDefaultName(propertyName);
+				AggregatedControllableProperty aggregatedProperty = AggregatedControllableProperty.getByDefaultName(propertyName);
+				switch (item) {
+					case LEADER:
+					case EXTERNAL_WORD_CLOCK:
+					case UNICAST_CLOCKING:
+						String requestValue = DanteDomainManagerConstant.NUMBER_ONE.equals(value) ? DanteDomainManagerConstant.TRUE : DanteDomainManagerConstant.FALSE;
+						sendCommandToControlClockSync(deviceId, requestValue, aggregatedProperty);
+						updateCacheValue(deviceId, propertyName, requestValue);
+						break;
+					case DELAY_REQUEST:
+						String currentValue = "Unicast".equals(value) ? DanteDomainManagerConstant.TRUE : DanteDomainManagerConstant.FALSE;
+						sendCommandToControlClockSync(deviceId, currentValue, aggregatedProperty);
+						updateCacheValue(deviceId, propertyName, currentValue);
+						break;
+
+					default:
+						if (logger.isWarnEnabled()) {
+							logger.warn(String.format("Unable to execute %s command on device %s: Not Supported", property, deviceId));
+						}
+						break;
+				}
+			} else {
+				throw new IllegalArgumentException(String.format("Unable to control property: %s as the device does not exist.", property));
+			}
+		} finally {
+			reentrantLock.unlock();
+		}
 	}
 
 	/**
@@ -552,29 +598,108 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 	 * @param stats The map to store system information properties.
 	 */
 	private void populateDomainInfo(Map<String, String> stats) {
-
 		for (JsonNode domain : domainList) {
+			String domainName = getText(domain, DanteDomainManagerConstant.NAME);
+			String groupDomain = buildGroupDomain(domainName);
 
-			String domainName = domain.get(DanteDomainManagerConstant.NAME).asText();
 			JsonNode statusNode = domain.get(DanteDomainManagerConstant.STATUS);
-			JsonNode alertNode = statusNode.get("domainAlertMessage");
+			JsonNode alertNode = statusNode != null ? statusNode.get("domainAlertMessage") : null;
 
-			String groupDomain = sanitizeGroup(SystemInformation.values()[0].getGroup() + "_" + domainName);
+			stats.put(buildKey(groupDomain, DanteDomainManagerConstant.DOMAIN_NAME), domainName);
+			stats.put(buildKey(groupDomain, "DomainDeviceCount"),
+					String.valueOf(domain.path(DanteDomainManagerConstant.DEVICES).size()));
 
-			stats.put(groupDomain + DanteDomainManagerConstant.HASH + DanteDomainManagerConstant.DOMAIN_NAME, domainName);
-			stats.put(groupDomain + DanteDomainManagerConstant.HASH + "DomainDeviceCount", String.valueOf(domain.get(DanteDomainManagerConstant.DEVICES).size()));
+			populateSystemInfo(stats, groupDomain, statusNode, alertNode);
+			populateClockingGroup(stats, groupDomain, domain.get("clockingGroup"));
+		}
+	}
 
-			for (SystemInformation item : SystemInformation.values()) {
-				String propertyName = item.getName();
-				String key = groupDomain + DanteDomainManagerConstant.HASH + propertyName;
-				String value = getDefaultValueForNullData(statusNode.get(item.getValue()).asText());
+	/**
+	 * Populates clocking group information into the stats map based on the domain mode.
+	 * The displayed fields vary depending on the mode (DEFAULT, SMPTE, AES67) and
+	 * PTP configuration (Default or Custom).
+	 *
+	 * @param stats         the map storing domain statistics
+	 * @param groupDomain   the domain group prefix for stat keys
+	 * @param clockingGroup the JSON node containing clocking group data
+	 */
+	private void populateClockingGroup(Map<String, String> stats, String groupDomain, JsonNode clockingGroup) {
+		if (clockingGroup == null) return;
+		String mode = getText(clockingGroup, ClockingGroupInfo.MODE.getField());
+		JsonNode ptp = clockingGroup.get("ptp");
+		JsonNode rtp = clockingGroup.get("rtp");
 
-				if (alertNode != null) {
-					JsonNode message = alertNode.get(item.getValue());
-					if (message != null && message.has(DanteDomainManagerConstant.MESSAGE)) {
-						stats.put(propertyName + "Message", message.get(DanteDomainManagerConstant.MESSAGE).asText());}
+		boolean isCustom = ptp != null
+				&& ptp.has(ClockingGroupInfo.PTP_CONFIGURATION.getField())
+				&& ptp.get(ClockingGroupInfo.PTP_CONFIGURATION.getField()).asBoolean();
+
+		String ptpConfig = isCustom ? "Custom" : "Default";
+
+		stats.put(buildKey(groupDomain, ClockingGroupInfo.MODE.getName()), "DEFAULT".equals(mode) ? uppercaseFirstCharacter(mode.toLowerCase()) : mode);
+		switch (mode.toUpperCase()) {
+			case "DEFAULT":
+				stats.put(buildKey(groupDomain, ClockingGroupInfo.PTP_CONFIGURATION.getName()), ptpConfig);
+				if (isCustom) {
+					putIfPresent(stats, groupDomain, ClockingGroupInfo.PTP_DOMAIN, ptp);
+					putIfPresent(stats, groupDomain, ClockingGroupInfo.PTP_PRIORITY1, ptp);
+					putIfPresent(stats, groupDomain, ClockingGroupInfo.PTP_PRIORITY2, ptp);
+					putIfPresent(stats, groupDomain, ClockingGroupInfo.PTP_SYNC_INTERVAL, ptp);
+					putIfPresent(stats, groupDomain, ClockingGroupInfo.PTP_ANNOUNCE_INTERVAL, ptp);
 				}
-				stats.put(key, value);
+				break;
+			case "SMPTE":
+				stats.put(buildKey(groupDomain, ClockingGroupInfo.PTP_CONFIGURATION.getName()), ptpConfig);
+				putIfPresent(stats, groupDomain, ClockingGroupInfo.PTP_DOMAIN, ptp);
+				putIfPresent(stats, groupDomain, ClockingGroupInfo.PTP_PRIORITY1, ptp);
+				putIfPresent(stats, groupDomain, ClockingGroupInfo.PTP_PRIORITY2, ptp);
+				putIfPresent(stats, groupDomain, ClockingGroupInfo.PTP_SYNC_INTERVAL, ptp);
+				putIfPresent(stats, groupDomain, ClockingGroupInfo.PTP_ANNOUNCE_INTERVAL, ptp);
+				putIfPresent(stats, groupDomain, ClockingGroupInfo.PTP_MULTICAST_TTL, ptp);
+				putIfPresent(stats, groupDomain, ClockingGroupInfo.PTP_SLAVE_ONLY, ptp);
+
+				putIfPresent(stats, groupDomain, ClockingGroupInfo.RTP_TRANSMIT_PORT, rtp);
+				putIfPresent(stats, groupDomain, ClockingGroupInfo.RTP_SYSTEM_PACKET_TIME, rtp);
+				putIfPresent(stats, groupDomain, ClockingGroupInfo.RTP_RX_LATENCY, rtp);
+				putIfPresent(stats, groupDomain, ClockingGroupInfo.RTP_PREFIX_V4, rtp);
+				break;
+			case "AES67":
+				stats.put(buildKey(groupDomain, ClockingGroupInfo.PTP_CONFIGURATION.getName()), ptpConfig);
+				if("Custom".equals(ptpConfig)){
+					putIfPresent(stats, groupDomain, ClockingGroupInfo.PTP_PRIORITY1, ptp);
+					putIfPresent(stats, groupDomain, ClockingGroupInfo.PTP_PRIORITY2, ptp);
+				}
+				putIfPresent(stats, groupDomain, ClockingGroupInfo.PTP_MULTICAST_TTL, ptp);
+				putIfPresent(stats, groupDomain, ClockingGroupInfo.RTP_PREFIX_V4, rtp);
+				break;
+
+			default:
+				break;
+		}
+	}
+
+	/**
+	 * Populates system status information and corresponding alert messages into the stats map.
+	 * Values are derived from the provided status and alert nodes based on {@link SystemInformation}.
+	 *
+	 * @param stats        the map storing domain statistics
+	 * @param groupDomain  the domain group prefix for stat keys
+	 * @param statusNode   the JSON node containing system status values
+	 * @param alertNode    the JSON node containing alert messages (optional)
+	 */
+	private void populateSystemInfo(Map<String, String> stats, String groupDomain, JsonNode statusNode, JsonNode alertNode) {
+		if (statusNode == null) return;
+		for (SystemInformation item : SystemInformation.values()) {
+			String propertyName = item.getName();
+			String key = buildKey(groupDomain, propertyName);
+			String value = getDefaultValueForNullData(
+					getText(statusNode, item.getValue())
+			);
+			stats.put(key, value);
+			if (alertNode != null) {
+				JsonNode messageNode = alertNode.get(item.getValue());
+				if (messageNode != null && messageNode.has(DanteDomainManagerConstant.MESSAGE)) {
+					stats.put(propertyName + "Message", messageNode.get(DanteDomainManagerConstant.MESSAGE).asText());
+				}
 			}
 		}
 	}
@@ -630,17 +755,17 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 
 	/**
 	 * Fetches device information from the API based on the current domain filter.
-	 * If {@link #domainNameFiltering} is provided, it resolves the corresponding domain ID
+	 * If {@link #domainNameFilter} is provided, it resolves the corresponding domain ID
 	 * and retrieves devices for that specific domain. Otherwise, it retrieves devices
 	 * across all domains.
 	 * @throws Exception if an error occurs during the API request
 	 */
 	private JsonNode fetchDeviceResponse() throws Exception {
 		String command;
-		if (StringUtils.isNotNullOrEmpty(domainNameFiltering)) {
-			String domainId = getDomainIdByName(domainNameFiltering);
+		if (StringUtils.isNotNullOrEmpty(domainNameFilter)) {
+			String domainId = getDomainIdByName(domainNameFilter);
 			if (domainId == null) {
-				logger.warn(String.format("Domain name '%s' not found", domainNameFiltering));
+				logger.warn(String.format("Domain name '%s' not found", domainNameFilter));
 				return null;
 			}
 			command = String.format(DanteDomainManagerQuery.DEVICES_BY_DOMAIN_ID, domainId);
@@ -710,6 +835,7 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 			String name = property.getName();
 			String propertyName = property.getGroup() + name;
 			String value = getDefaultValueForNullData(cachedValue.get(name));
+			String domainMode = getDefaultValueForNullData(cachedValue.get("DomainMode"));
 			switch (property) {
 				case CLOCKING:
 				case LATENCY:
@@ -749,8 +875,20 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 					}
 					stats.put(propertyName, newValue);
 					break;
-				case EXTERNAL_WORD_CLOCK:
 				case LEADER:
+					if(!"SMPTE".equals(domainMode) && DanteDomainManagerConstant.TRUE.equals(getDefaultValueForNullData(cachedValue.get(name + DanteDomainManagerConstant.CAPABILITY)))){
+						addAdvancedControlProperties(advancedControllableProperties, statsControl,
+								createSwitch(propertyName, DanteDomainManagerConstant.TRUE.equals(value) ? 1 : 0, DanteDomainManagerConstant.OFF, DanteDomainManagerConstant.ON),
+								DanteDomainManagerConstant.TRUE.equals(value) ? DanteDomainManagerConstant.NUMBER_ONE : DanteDomainManagerConstant.ZERO);
+					}
+					break;
+				case PTP_PRIORITY1:
+					handleSMPTEPriority(domainMode, cachedValue, stats, propertyName, value, "DomainPTPV2Priority1");
+					break;
+				case PTP_PRIORITY2:
+					handleSMPTEPriority(domainMode, cachedValue, stats, propertyName, value, "DomainPTPV2Priority2");
+					break;
+				case EXTERNAL_WORD_CLOCK:
 				case UNICAST_CLOCKING:
 					if (DanteDomainManagerConstant.TRUE.equals(getDefaultValueForNullData(cachedValue.get(name + DanteDomainManagerConstant.CAPABILITY)))) {
 						addAdvancedControlProperties(advancedControllableProperties, statsControl,
@@ -760,9 +898,10 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 					break;
 				case DELAY_REQUEST:
 					if (DanteDomainManagerConstant.TRUE.equals(getDefaultValueForNullData(cachedValue.get(name + DanteDomainManagerConstant.CAPABILITY)))) {
+						List<String> listDelayRequest = Arrays.asList("Multicast", "Unicast");
 						addAdvancedControlProperties(advancedControllableProperties, statsControl,
-								createSwitch(propertyName, DanteDomainManagerConstant.TRUE.equals(value) ? 1 : 0, "Multicast", "Unicast"),
-								DanteDomainManagerConstant.TRUE.equals(value) ? DanteDomainManagerConstant.NUMBER_ONE : DanteDomainManagerConstant.ZERO);
+								createDropdown(propertyName, listDelayRequest, DanteDomainManagerConstant.TRUE.equals(value) ? "Unicast" : "Multicast"),
+								DanteDomainManagerConstant.TRUE.equals(value) ? "Unicast" : "Multicast");
 					}
 					break;
 				case RECEIVE_CHANNELS:
@@ -801,6 +940,39 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 					stats.put(propertyName, value);
 			}
 		}
+	}
+
+	/**
+	 * Sends a control command to the specified device for a controllable property.
+	 *
+	 * @param deviceId The ID of the device to control.
+	 * @param value The value to set for the controllable property.
+	 * @param property The controllable property to control.
+	 */
+	private void sendCommandToControlClockSync(String deviceId, String value, AggregatedControllableProperty property) {
+		try {
+			String command = String.format(DanteDomainManagerQuery.CONTROL_CLOCK_SYNC, property.getCommandParam(), property.getCommandName(), deviceId, value);
+			JsonNode response = this.doPost(DanteDomainManagerConstant.URL, command, JsonNode.class);
+			if (response.has(DanteDomainManagerConstant.ERRORS)) {
+				throw new IllegalArgumentException("The command response is error");
+			}
+
+		} catch (Exception e) {
+			throw new IllegalArgumentException(
+					String.format("Can't control %s with value is %s. %s", property.getName(), DanteDomainManagerConstant.TRUE.equals(value) ? DanteDomainManagerConstant.ON : DanteDomainManagerConstant.OFF, e.getMessage()));
+		}
+	}
+
+	/**
+	 * Updates the cache value for a specified property in the aggregated device list.
+	 *
+	 * @param deviceId The ID of the device whose cache value needs to be updated.
+	 * @param name The name of the property to be updated.
+	 * @param value The new value to set for the property.
+	 */
+	private void updateCacheValue(String deviceId, String name, String value) {
+		cachedData.stream().filter(item -> deviceId.equals(item.getDeviceId()))
+				.findFirst().ifPresent(item -> item.getProperties().put(name, value));
 	}
 
 	/**
@@ -891,6 +1063,84 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 		advancedControllableProperty.setTimestamp(new Date());
 
 		return advancedControllableProperty;
+	}
+
+	/**
+	 * capitalize the first character of the string
+	 *
+	 * @param input input string
+	 * @return string after fix
+	 */
+	private String uppercaseFirstCharacter(String input) {
+		return Character.toUpperCase(input.charAt(0)) + input.substring(1);
+	}
+
+	/**
+	 * Builds a composite key using the group prefix and property name.
+	 *
+	 * @param group    the group prefix
+	 * @param property the property name
+	 * @return the combined key in the format "group#property"
+	 */
+	private String buildKey(String group, String property) {
+		return group + DanteDomainManagerConstant.HASH + property;
+	}
+
+	/**
+	 * Constructs a sanitized domain group identifier based on the domain name.
+	 *
+	 * @param domainName the domain name
+	 * @return the formatted and sanitized group domain string
+	 */
+	private String buildGroupDomain(String domainName) {
+		return sanitizeGroup(SystemInformation.values()[0].getGroup() + "_" + domainName);
+	}
+
+	/**
+	 * Retrieves a text value from the given JSON node for the specified field.
+	 * Returns a default value if the field is missing or null.
+	 *
+	 * @param node  the source JSON node
+	 * @param field the field name to extract
+	 * @return the field value as text, or a default fallback if unavailable
+	 */
+	private String getText(JsonNode node, String field) {
+		return node != null && node.has(field) && !node.get(field).isNull()
+				? node.get(field).asText()
+				: DanteDomainManagerConstant.NOT_AVAILABLE;
+	}
+
+	/**
+	 * Adds a property to the stats map if the specified field exists and is not null in the given JSON node.
+	 *
+	 * @param stats       the map storing statistics
+	 * @param groupDomain the domain group prefix for the key
+	 * @param field       the clocking group field definition
+	 * @param node        the JSON node containing the data
+	 */
+	private void putIfPresent(Map<String, String> stats, String groupDomain, ClockingGroupInfo field, JsonNode node) {
+		if (node == null) return;
+		JsonNode valueNode = node.get(field.getField());
+		if (valueNode != null && !valueNode.isNull()) {
+			stats.put(buildKey(groupDomain, field.getName()), valueNode.asText());
+		}
+	}
+
+	/**
+	 * Handles SMPTE-specific priority properties by applying a fallback value when needed.
+	 * If the current value is not available, it retrieves the corresponding domain-level value.
+	 *
+	 * @param domainMode  the current domain mode
+	 * @param cachedValue the cached domain values used for fallback
+	 * @param stats       the map storing statistics
+	 * @param propertyName the property key to update
+	 * @param value       the current property value
+	 * @param fallbackKey the key used to retrieve the fallback value from cache
+	 */
+	private void handleSMPTEPriority(String domainMode, Map<String, String> cachedValue, Map<String, String> stats, String propertyName, String value, String fallbackKey) {
+		if (!"SMPTE".equals(domainMode)) return;
+		String fallbackValue = getDefaultValueForNullData(cachedValue.get(fallbackKey));
+		stats.put(propertyName, DanteDomainManagerConstant.NOT_AVAILABLE.equals(value) ? fallbackValue : value);
 	}
 
 	/**

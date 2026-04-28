@@ -41,6 +41,8 @@ public enum AggregatedInformation {
 
 	EXTERNAL_WORD_CLOCK("SyncToExternalWordClock", DanteDomainManagerConstant.CLOCK_SYNCHRONISATION_GROUP),
 	LEADER("PreferredLeader", DanteDomainManagerConstant.CLOCK_SYNCHRONISATION_GROUP),
+	PTP_PRIORITY1("PTPV2Priority1", DanteDomainManagerConstant.CLOCK_SYNCHRONISATION_GROUP),
+	PTP_PRIORITY2("PTPV2Priority2", DanteDomainManagerConstant.CLOCK_SYNCHRONISATION_GROUP),
 	UNICAST_CLOCKING("UnicastClocking", DanteDomainManagerConstant.CLOCK_SYNCHRONISATION_GROUP),
 	DELAY_REQUEST("V1DelayRequests", DanteDomainManagerConstant.CLOCK_SYNCHRONISATION_GROUP),
 	RECEIVE_CHANNELS("ReceiveChannels", DanteDomainManagerConstant.RECEIVE_GROUP),
