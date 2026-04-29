@@ -11,10 +11,12 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -195,6 +197,62 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 		}
 	}
 
+	/** Set of group filter for {@code displayPropertyGroups}. */
+	private static final Set<String> GROUP_FILTERS = Set.of(
+			DanteDomainManagerConstant.CLOCK_SYNCHRONISATION,
+			DanteDomainManagerConstant.STATUS_GROUP_FILTER,
+			DanteDomainManagerConstant.DOMAIN,
+			DanteDomainManagerConstant.TRANSMIT,
+			DanteDomainManagerConstant.RECEIVE,
+			DanteDomainManagerConstant.GENERAL
+	);
+
+	/** Indicates whether groups are displayed; defaults is General. */
+	private final Set<String> displayPropertyGroups = new HashSet<>(Set.of(DanteDomainManagerConstant.GENERAL));
+
+	/**
+	 * Returns a comma-separated list of property group names that are configured to be displayed.
+	 *
+	 * @return a comma-separated string of display property group names; may be empty if no groups are configured
+	 */
+	public String getDisplayPropertyGroups() {
+		return this.displayPropertyGroups.stream()
+				.sorted()
+				.collect(Collectors.joining(DanteDomainManagerConstant.COMMA_SPACE));
+	}
+
+	/**
+	 * Sets the display property groups based on a comma-separated list.
+	 * <p>
+	 * Trims values automatically. If All is present, SUPPORTED_GROUP_FILTERS are added.
+	 * Invalid groups trigger a warning and only the default group applied. {@code null} or empty input is ignored.
+	 * </p>
+	 *`
+	 * @param displayPropertyGroups comma-separated group names; may be {@code null} or empty
+	 */
+	public void setDisplayPropertyGroups(String displayPropertyGroups) {
+		if (StringUtils.isNullOrEmpty(displayPropertyGroups, true)) {
+			return;
+		}
+		Set<String> checkedGroups = Arrays.stream(displayPropertyGroups.split(DanteDomainManagerConstant.COMMA))
+				.map(String::trim)
+				.filter(p -> !p.isEmpty())
+				.collect(Collectors.toSet());
+
+		this.displayPropertyGroups.clear();
+
+		if (checkedGroups.contains(DanteDomainManagerConstant.ALL)) {
+			this.displayPropertyGroups.addAll(GROUP_FILTERS);
+			return;
+		}
+
+		if (!CollectionUtils.containsAny(GROUP_FILTERS, checkedGroups)) {
+			this.logger.warn("No valid display property groups found from input: '%s'".formatted(displayPropertyGroups));
+		}
+		this.displayPropertyGroups.add(DanteDomainManagerConstant.GENERAL);
+		checkedGroups.stream().filter(GROUP_FILTERS::contains).forEach(this.displayPropertyGroups::add);
+	}
+
 	/**
 	 * Indicates whether a device is considered as paused.
 	 * True by default so if the system is rebooted and the actual value is lost -> the device won't start stats
@@ -350,7 +408,9 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 			ExtendedStatistics extendedStatistics = new ExtendedStatistics();
 			retrieveMetadata(statistics, dynamicStatistics);
 			retrieveSystemInfo();
-			populateDomainInfo(statistics);
+			if(isDisplayGroup(DanteDomainManagerConstant.DOMAIN)){
+				populateDomainInfo(statistics);
+			}
 			extendedStatistics.setStatistics(statistics);
 			extendedStatistics.setDynamicStatistics(dynamicStatistics);
 			localExtendedStatistics = extendedStatistics;
@@ -506,6 +566,7 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 		nextDevicesCollectionIterationTimestamp = 0;
 		aggregatedDeviceList.clear();
 		cachedData.clear();
+		displayPropertyGroups.clear();
 		super.internalDestroy();
 	}
 
@@ -526,6 +587,7 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 
 			stats.put(DanteDomainManagerConstant.ADAPTER_UPTIME_MIN, String.valueOf(adapterUptime / (1000 * 60)));
 			stats.put(DanteDomainManagerConstant.ADAPTER_UPTIME, normalizeUptime(adapterUptime / 1000));
+			stats.put(DanteDomainManagerConstant.ACTIVE_PROPERTY_GROUPS, this.getDisplayPropertyGroups());
 			try{
 				stats.put(DanteDomainManagerConstant.SYSTEM_MONITORING_CYCLE, String.valueOf(getMonitoringRate()));
 			}catch (NoSuchMethodError error){
@@ -832,6 +894,10 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 	 */
 	private void mapMonitoringProperty(Map<String, String> cachedValue, Map<String, String> stats, Map<String, String> statsControl, List<AdvancedControllableProperty> advancedControllableProperties) {
 		for (AggregatedInformation property : AggregatedInformation.values()) {
+			String groupForFilter = normalizeGroup(property.getGroup());
+			if (!isDisplayGroup(groupForFilter)) {
+				continue;
+			}
 			String name = property.getName();
 			String propertyName = property.getGroup() + name;
 			String value = getDefaultValueForNullData(cachedValue.get(name));
@@ -1176,6 +1242,31 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 				.map(domain -> domain.get(DanteDomainManagerConstant.ID).asText())
 				.findFirst()
 				.orElse(null);
+	}
+
+	/**
+	 * Checks whether the given group name is configured to be displayed.
+	 *
+	 * @param groupName the group name to check
+	 * @return {@code true} if {@code displayPropertyGroups} is not empty and contains {@code groupName}; otherwise {@code false}
+	 */
+	private boolean isDisplayGroup(String groupName) {
+		return !CollectionUtils.isEmpty(this.displayPropertyGroups) && this.displayPropertyGroups.contains(groupName);
+	}
+
+	/**
+	 * Normalizes group name by removing trailing separators such as '#' and '_'.
+	 *
+	 * @param group the raw group value
+	 * @return normalized group name used for filtering
+	 */
+	private String normalizeGroup(String group) {
+		if (StringUtils.isNullOrEmpty(group, true)) {
+			return DanteDomainManagerConstant.GENERAL;
+		}
+
+		// trim + remove trailing '#' or '_'
+		return group.trim().replaceAll("[#_]+$", "");
 	}
 
 	/**

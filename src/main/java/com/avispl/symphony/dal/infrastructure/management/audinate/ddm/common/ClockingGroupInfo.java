@@ -22,8 +22,8 @@ public enum ClockingGroupInfo {
 	PTP_SLAVE_ONLY("PTPSlaveOnly", "followerOnly", NodeType.PTP),
 
 	RTP_PREFIX_V4("RTPPrefixV4", "prefixV4", NodeType.RTP),
-	RTP_RX_LATENCY("RxLatency", "rxLatency", NodeType.RTP),
-	RTP_SYSTEM_PACKET_TIME("SystemPacketTime", "systemPacketTime", NodeType.RTP),
+	RTP_RX_LATENCY("RxLatency(s)", "rxLatency", NodeType.RTP),
+	RTP_SYSTEM_PACKET_TIME("SystemPacketTime(µs)", "systemPacketTime", NodeType.RTP),
 	RTP_TRANSMIT_PORT("RTPTransmitPort", "transmitPort", NodeType.RTP);
 
 	private final String name;

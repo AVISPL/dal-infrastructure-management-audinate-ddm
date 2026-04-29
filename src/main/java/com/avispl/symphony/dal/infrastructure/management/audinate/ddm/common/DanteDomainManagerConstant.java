@@ -16,8 +16,9 @@ public class DanteDomainManagerConstant {
 	public static final String MODEL_MAPPING_AGGREGATED_DEVICE = "dante/model-mapping.yml";
 	public static final String NOT_AVAILABLE = "N/A";
 	public static final String NONE = "None";
-	public static final String SPACE = " ";
-	public static final String EMPTY = "";
+	public static final String ALL = "All";
+	public static final String COMMA = ",";
+	public static final String COMMA_SPACE = ", ";
 	public static final String TRUE = "true";
 	public static final String FALSE = "false";
 	public static final String ON = "On";
@@ -42,6 +43,7 @@ public class DanteDomainManagerConstant {
 	public static final String EXTENSIONS = "extensions";
 	public static final String CODE = "code";
 	public static final String MESSAGE = "message";
+	public static final String ACTIVE_PROPERTY_GROUPS = "ActivePropertyGroups";
 
 	// Adapter metadata
 	public static final String MONITORING_CYCLE_DURATION = "LastMonitoringCycleDuration(sec)";
@@ -51,4 +53,12 @@ public class DanteDomainManagerConstant {
 	public static final String ADAPTER_UPTIME_MIN = "AdapterUptime(min)";
 	public static final String ADAPTER_UPTIME = "AdapterUptime";
 	public static final String SYSTEM_MONITORING_CYCLE = "MonitoringCycleInterval(min)";
+
+	/* Group filter */
+	public static final String GENERAL = "General";
+	public static final String CLOCK_SYNCHRONISATION = "ClockSynchronisation";
+	public static final String STATUS_GROUP_FILTER = "Status";
+	public static final String DOMAIN = "Domain";
+	public static final String TRANSMIT = "Transmit";
+	public static final String RECEIVE = "Receive";
 }
