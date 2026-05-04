@@ -408,7 +408,7 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 			ExtendedStatistics extendedStatistics = new ExtendedStatistics();
 			retrieveMetadata(statistics, dynamicStatistics);
 			retrieveSystemInfo();
-			if(isDisplayGroup(DanteDomainManagerConstant.DOMAIN)){
+			if(validateGroupDisplay(DanteDomainManagerConstant.DOMAIN)){
 				populateDomainInfo(statistics);
 			}
 			extendedStatistics.setStatistics(statistics);
@@ -725,11 +725,8 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 				putIfPresent(stats, groupDomain, ClockingGroupInfo.RTP_PREFIX_V4, rtp);
 				break;
 			case "AES67":
-				stats.put(buildKey(groupDomain, ClockingGroupInfo.PTP_CONFIGURATION.getName()), ptpConfig);
-				if("Custom".equals(ptpConfig)){
-					putIfPresent(stats, groupDomain, ClockingGroupInfo.PTP_PRIORITY1, ptp);
-					putIfPresent(stats, groupDomain, ClockingGroupInfo.PTP_PRIORITY2, ptp);
-				}
+				putIfPresent(stats, groupDomain, ClockingGroupInfo.PTP_PRIORITY1, ptp);
+				putIfPresent(stats, groupDomain, ClockingGroupInfo.PTP_PRIORITY2, ptp);
 				putIfPresent(stats, groupDomain, ClockingGroupInfo.PTP_MULTICAST_TTL, ptp);
 				putIfPresent(stats, groupDomain, ClockingGroupInfo.RTP_PREFIX_V4, rtp);
 				break;
@@ -895,7 +892,7 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 	private void mapMonitoringProperty(Map<String, String> cachedValue, Map<String, String> stats, Map<String, String> statsControl, List<AdvancedControllableProperty> advancedControllableProperties) {
 		for (AggregatedInformation property : AggregatedInformation.values()) {
 			String groupForFilter = normalizeGroup(property.getGroup());
-			if (!isDisplayGroup(groupForFilter)) {
+			if (!validateGroupDisplay(groupForFilter)) {
 				continue;
 			}
 			String name = property.getName();
@@ -1250,7 +1247,7 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 	 * @param groupName the group name to check
 	 * @return {@code true} if {@code displayPropertyGroups} is not empty and contains {@code groupName}; otherwise {@code false}
 	 */
-	private boolean isDisplayGroup(String groupName) {
+	private boolean validateGroupDisplay(String groupName) {
 		return !CollectionUtils.isEmpty(this.displayPropertyGroups) && this.displayPropertyGroups.contains(groupName);
 	}
 
