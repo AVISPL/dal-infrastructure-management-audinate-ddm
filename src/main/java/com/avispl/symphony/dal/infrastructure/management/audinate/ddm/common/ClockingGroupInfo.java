@@ -13,6 +13,7 @@ package com.avispl.symphony.dal.infrastructure.management.audinate.ddm.common;
 public enum ClockingGroupInfo {
 	MODE("ClockingGroupMode", "mode", NodeType.ROOT),
 	PTP_CONFIGURATION("PTPConfiguration", "v2", NodeType.PTP),
+	PTP_V1_MULTICAST("PTPv1Multicast", "v1", NodeType.PTP),
 	PTP_PRIORITY1("PTPv2Priority1", "v2Priority1", NodeType.PTP),
 	PTP_PRIORITY2("PTPv2Priority2", "v2Priority2", NodeType.PTP),
 	PTP_DOMAIN("PTPv2DomainNumber", "v2DomainNumber", NodeType.PTP),
@@ -22,7 +23,7 @@ public enum ClockingGroupInfo {
 	PTP_SLAVE_ONLY("PTPSlaveOnly", "followerOnly", NodeType.PTP),
 
 	RTP_PREFIX_V4("RTPPrefixV4", "prefixV4", NodeType.RTP),
-	RTP_RX_LATENCY("RxLatency(sec)", "rxLatency", NodeType.RTP),
+	RTP_RX_LATENCY("RxLatency(µsec)", "rxLatency", NodeType.RTP),
 	RTP_SYSTEM_PACKET_TIME("SystemPacketTime(µsec)", "systemPacketTime", NodeType.RTP),
 	RTP_TRANSMIT_PORT("RTPTransmitPort", "transmitPort", NodeType.RTP);
 

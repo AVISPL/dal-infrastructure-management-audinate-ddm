@@ -17,7 +17,7 @@ public class DanteDomainManagerQuery {
 			+ "devices { id } "
 			+ "clockingGroup { "
 			+ "mode "
-			+ "ptp { v2 v2Priority1 v2Priority2 v2DomainNumber v2MulticastTtl followerOnly v2SyncInterval v2AnnounceInterval } "
+			+ "ptp { v1 v2 v2Priority1 v2Priority2 v2DomainNumber v2MulticastTtl followerOnly v2SyncInterval v2AnnounceInterval } "
 			+ "rtp { prefixV4 rxLatency systemPacketTime transmitPort } "
 			+ "} "
 			+ "status { clocking connectivity latency subscriptions summary "
