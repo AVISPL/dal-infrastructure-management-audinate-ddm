@@ -710,7 +710,6 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 				}
 				break;
 			case "SMPTE":
-				stats.put(buildKey(groupDomain, ClockingGroupInfo.PTP_CONFIGURATION.getName()), ptpConfig);
 				putIfPresent(stats, groupDomain, ClockingGroupInfo.PTP_V1_MULTICAST, ptp);
 				putIfPresent(stats, groupDomain, ClockingGroupInfo.PTP_DOMAIN, ptp);
 				putIfPresent(stats, groupDomain, ClockingGroupInfo.PTP_PRIORITY1, ptp);
