@@ -59,6 +59,4 @@ public class DanteDomainManagerConstant {
 	public static final String CLOCK_SYNCHRONISATION = "ClockSynchronisation";
 	public static final String STATUS_GROUP_FILTER = "Status";
 	public static final String DOMAIN = "Domain";
-	public static final String TRANSMIT = "Transmit";
-	public static final String RECEIVE = "Receive";
 }

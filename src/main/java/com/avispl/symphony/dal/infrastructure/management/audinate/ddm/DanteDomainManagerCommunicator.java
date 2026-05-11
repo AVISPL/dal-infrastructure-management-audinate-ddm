@@ -28,13 +28,13 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.util.CollectionUtils;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import javax.security.auth.login.FailedLoginException;
 
 import com.avispl.symphony.api.dal.control.Controller;
 import com.avispl.symphony.api.dal.dto.control.AdvancedControllableProperty;
+import com.avispl.symphony.api.dal.dto.control.AdvancedControllableProperty.Switch;
 import com.avispl.symphony.api.dal.dto.control.ControllableProperty;
 import com.avispl.symphony.api.dal.dto.monitor.ExtendedStatistics;
 import com.avispl.symphony.api.dal.dto.monitor.Statistics;
@@ -52,8 +52,6 @@ import com.avispl.symphony.dal.infrastructure.management.audinate.ddm.common.Clo
 import com.avispl.symphony.dal.infrastructure.management.audinate.ddm.common.DanteDomainManagerConstant;
 import com.avispl.symphony.dal.infrastructure.management.audinate.ddm.common.DanteDomainManagerQuery;
 import com.avispl.symphony.dal.infrastructure.management.audinate.ddm.common.SystemInformation;
-import com.avispl.symphony.dal.infrastructure.management.audinate.ddm.dto.ReceiveChannelDTO;
-import com.avispl.symphony.dal.infrastructure.management.audinate.ddm.dto.TransmitChannelDTO;
 import com.avispl.symphony.dal.util.StringUtils;
 import static com.avispl.symphony.dal.util.ControllablePropertyFactory.*;
 
@@ -202,8 +200,6 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 			DanteDomainManagerConstant.CLOCK_SYNCHRONISATION,
 			DanteDomainManagerConstant.STATUS_GROUP_FILTER,
 			DanteDomainManagerConstant.DOMAIN,
-			DanteDomainManagerConstant.TRANSMIT,
-			DanteDomainManagerConstant.RECEIVE,
 			DanteDomainManagerConstant.GENERAL
 	);
 
@@ -430,6 +426,7 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 			String property = controllableProperty.getProperty();
 			String deviceId = controllableProperty.getDeviceId();
 			String value = String.valueOf(controllableProperty.getValue());
+			String requestValue = "";
 
 			String[] propertyList = property.split(DanteDomainManagerConstant.HASH);
 			String propertyName = property;
@@ -442,9 +439,12 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 				AggregatedControllableProperty aggregatedProperty = AggregatedControllableProperty.getByDefaultName(propertyName);
 				switch (item) {
 					case LEADER:
+						requestValue = DanteDomainManagerConstant.NUMBER_ONE.equals(value) ? DanteDomainManagerConstant.TRUE : DanteDomainManagerConstant.FALSE;
+						sendCommandToPreferredLeader(deviceId, requestValue, aggregatedProperty);
+						updateCacheValue(deviceId, propertyName, requestValue);
+						break;
 					case EXTERNAL_WORD_CLOCK:
 					case UNICAST_CLOCKING:
-						String requestValue = DanteDomainManagerConstant.NUMBER_ONE.equals(value) ? DanteDomainManagerConstant.TRUE : DanteDomainManagerConstant.FALSE;
 						sendCommandToControlClockSync(deviceId, requestValue, aggregatedProperty);
 						updateCacheValue(deviceId, propertyName, requestValue);
 						break;
@@ -705,8 +705,6 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 					putIfPresent(stats, groupDomain, ClockingGroupInfo.PTP_DOMAIN, ptp);
 					putIfPresent(stats, groupDomain, ClockingGroupInfo.PTP_PRIORITY1, ptp);
 					putIfPresent(stats, groupDomain, ClockingGroupInfo.PTP_PRIORITY2, ptp);
-					putIfPresent(stats, groupDomain, ClockingGroupInfo.PTP_SYNC_INTERVAL, ptp);
-					putIfPresent(stats, groupDomain, ClockingGroupInfo.PTP_ANNOUNCE_INTERVAL, ptp);
 				}
 				break;
 			case "SMPTE":
@@ -899,6 +897,7 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 			String propertyName = property.getGroup() + name;
 			String value = getDefaultValueForNullData(cachedValue.get(name));
 			String domainMode = getDefaultValueForNullData(cachedValue.get("DomainMode"));
+			String ptpConfigMode = getDefaultValueForNullData(cachedValue.get("PTPConfiguration"));
 			switch (property) {
 				case CLOCKING:
 				case LATENCY:
@@ -939,17 +938,15 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 					stats.put(propertyName, newValue);
 					break;
 				case LEADER:
-					if(!"SMPTE".equals(domainMode) && DanteDomainManagerConstant.TRUE.equals(getDefaultValueForNullData(cachedValue.get(name + DanteDomainManagerConstant.CAPABILITY)))){
+					if(("DEFAULT".equals(domainMode) && DanteDomainManagerConstant.FALSE.equals(ptpConfigMode)) || "AES67".equals(domainMode) && DanteDomainManagerConstant.TRUE.equals(getDefaultValueForNullData(cachedValue.get(name + DanteDomainManagerConstant.CAPABILITY)))){
 						addAdvancedControlProperties(advancedControllableProperties, statsControl,
 								createSwitch(propertyName, DanteDomainManagerConstant.TRUE.equals(value) ? 1 : 0, DanteDomainManagerConstant.OFF, DanteDomainManagerConstant.ON),
 								DanteDomainManagerConstant.TRUE.equals(value) ? DanteDomainManagerConstant.NUMBER_ONE : DanteDomainManagerConstant.ZERO);
 					}
 					break;
 				case PTP_PRIORITY1:
-					handleSMPTEPriority(domainMode, cachedValue, stats, propertyName, value, "DomainPTPV2Priority1");
-					break;
 				case PTP_PRIORITY2:
-					handleSMPTEPriority(domainMode, cachedValue, stats, propertyName, value, "DomainPTPV2Priority2");
+					handleSMPTEPriority(ptpConfigMode, stats, propertyName, value);
 					break;
 				case EXTERNAL_WORD_CLOCK:
 				case UNICAST_CLOCKING:
@@ -960,43 +957,12 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 					}
 					break;
 				case DELAY_REQUEST:
-					if (DanteDomainManagerConstant.TRUE.equals(getDefaultValueForNullData(cachedValue.get(name + DanteDomainManagerConstant.CAPABILITY)))) {
+					String v1Multicast = getDefaultValueForNullData(cachedValue.get("PTPv1Multicast"));
+					if (DanteDomainManagerConstant.TRUE.equals(v1Multicast) && DanteDomainManagerConstant.TRUE.equals(getDefaultValueForNullData(cachedValue.get(name + DanteDomainManagerConstant.CAPABILITY)))) {
 						List<String> listDelayRequest = Arrays.asList("Multicast", "Unicast");
 						addAdvancedControlProperties(advancedControllableProperties, statsControl,
 								createDropdown(propertyName, listDelayRequest, DanteDomainManagerConstant.TRUE.equals(value) ? "Unicast" : "Multicast"),
 								DanteDomainManagerConstant.TRUE.equals(value) ? "Unicast" : "Multicast");
-					}
-					break;
-				case RECEIVE_CHANNELS:
-					try {
-						List<ReceiveChannelDTO> channelList = objectMapper.readValue(value, new TypeReference<List<ReceiveChannelDTO>>() {
-						});
-						if (!channelList.isEmpty()) {
-							for (ReceiveChannelDTO item : channelList) {
-								String channelName = item.getName();
-									stats.put(DanteDomainManagerConstant.RECEIVE_GROUP + channelName + DanteDomainManagerConstant.HASH + "SubscribedChannel", item.getSubscribedChannel());
-									stats.put(DanteDomainManagerConstant.RECEIVE_GROUP + channelName + DanteDomainManagerConstant.HASH + "SubscribedDevice", item.getSubscribedDevice());
-									stats.put(DanteDomainManagerConstant.RECEIVE_GROUP + channelName + DanteDomainManagerConstant.HASH + "MediaType", item.getMediaType());
-									stats.put(DanteDomainManagerConstant.RECEIVE_GROUP + channelName + DanteDomainManagerConstant.HASH + "Name", item.getName());
-							}
-						}
-					} catch (Exception e) {
-						logger.error("Error occurred while retrieving receive channels", e);
-					}
-					break;
-				case TRANSMIT_CHANNELS:
-					try{
-						List<TransmitChannelDTO> txList = objectMapper.readValue(value, new TypeReference<List<TransmitChannelDTO>>() {});
-						if(!txList.isEmpty()){
-							for(TransmitChannelDTO item : txList){
-								String channelName = item.getName();
-								stats.put(DanteDomainManagerConstant.TRANSMIT_GROUP + channelName + DanteDomainManagerConstant.HASH + "ID", item.getId());
-								stats.put(DanteDomainManagerConstant.TRANSMIT_GROUP + channelName + DanteDomainManagerConstant.HASH + "Name", item.getName());
-								stats.put(DanteDomainManagerConstant.TRANSMIT_GROUP + channelName + DanteDomainManagerConstant.HASH + "MediaType", item.getMediaType());
-							}
-						}
-					} catch (Exception e) {
-						logger.error("Error occurred while retrieving transmit channels", e);
 					}
 					break;
 				default:
@@ -1023,6 +989,25 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 		} catch (Exception e) {
 			throw new IllegalArgumentException(
 					String.format("Can't control %s with value is %s. %s", property.getName(), DanteDomainManagerConstant.TRUE.equals(value) ? DanteDomainManagerConstant.ON : DanteDomainManagerConstant.OFF, e.getMessage()));
+		}
+	}
+
+	/**
+	 * Sends a command to update the Preferred Leader setting for a specific device.
+	 *
+	 * @param deviceId the target device ID
+	 * @param value the value to be applied
+	 * @param property the controllable property containing command details
+	 */
+	private void sendCommandToPreferredLeader(String deviceId, String value, AggregatedControllableProperty property) {
+		try {
+			String command = String.format(DanteDomainManagerQuery.CONTROL_CLOCK_SYNC, property.getCommandParam(), property.getCommandName(), deviceId, value);
+			JsonNode response = this.doPost(DanteDomainManagerConstant.URL, command, JsonNode.class);
+			if (response.has(DanteDomainManagerConstant.ERRORS)) {
+				throw new IllegalArgumentException(String.format(response.get("errors").get(0).get("message").asText()));
+			}
+		} catch (Exception e) {
+			throw new IllegalArgumentException(e.getMessage());
 		}
 	}
 
@@ -1115,7 +1100,7 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 	 * @return AdvancedControllableProperty switch instance
 	 */
 	private AdvancedControllableProperty createSwitch(String name, int status, String labelOff, String labelOn) {
-		AdvancedControllableProperty.Switch toggle = new AdvancedControllableProperty.Switch();
+		Switch toggle = new Switch();
 		toggle.setLabelOff(labelOff);
 		toggle.setLabelOn(labelOn);
 
@@ -1193,17 +1178,14 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 	 * Handles SMPTE-specific priority properties by applying a fallback value when needed.
 	 * If the current value is not available, it retrieves the corresponding domain-level value.
 	 *
-	 * @param domainMode  the current domain mode
-	 * @param cachedValue the cached domain values used for fallback
+	 * @param ptpConfigMode  the current ptp configuration mode
 	 * @param stats       the map storing statistics
 	 * @param propertyName the property key to update
 	 * @param value       the current property value
-	 * @param fallbackKey the key used to retrieve the fallback value from cache
 	 */
-	private void handleSMPTEPriority(String domainMode, Map<String, String> cachedValue, Map<String, String> stats, String propertyName, String value, String fallbackKey) {
-		if (!"SMPTE".equals(domainMode)) return;
-		String fallbackValue = getDefaultValueForNullData(cachedValue.get(fallbackKey));
-		stats.put(propertyName, DanteDomainManagerConstant.NOT_AVAILABLE.equals(value) ? fallbackValue : value);
+	private void handleSMPTEPriority(String ptpConfigMode, Map<String, String> stats, String propertyName, String value) {
+		if (DanteDomainManagerConstant.FALSE.equals(ptpConfigMode) || DanteDomainManagerConstant.NOT_AVAILABLE.equals(value)) return;
+		stats.put(propertyName, value);
 	}
 
 	/**
