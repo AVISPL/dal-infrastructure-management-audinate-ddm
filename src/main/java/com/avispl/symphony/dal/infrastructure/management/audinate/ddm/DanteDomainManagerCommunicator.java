@@ -426,7 +426,6 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 			String property = controllableProperty.getProperty();
 			String deviceId = controllableProperty.getDeviceId();
 			String value = String.valueOf(controllableProperty.getValue());
-			String requestValue = "";
 
 			String[] propertyList = property.split(DanteDomainManagerConstant.HASH);
 			String propertyName = property;
@@ -437,9 +436,9 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 			if (aggregatedDevice.isPresent()) {
 				AggregatedInformation item = AggregatedInformation.getByDefaultName(propertyName);
 				AggregatedControllableProperty aggregatedProperty = AggregatedControllableProperty.getByDefaultName(propertyName);
+				String requestValue = DanteDomainManagerConstant.NUMBER_ONE.equals(value) ? DanteDomainManagerConstant.TRUE : DanteDomainManagerConstant.FALSE;
 				switch (item) {
 					case LEADER:
-						requestValue = DanteDomainManagerConstant.NUMBER_ONE.equals(value) ? DanteDomainManagerConstant.TRUE : DanteDomainManagerConstant.FALSE;
 						sendCommandToPreferredLeader(deviceId, requestValue, aggregatedProperty);
 						updateCacheValue(deviceId, propertyName, requestValue);
 						break;
