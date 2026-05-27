@@ -897,6 +897,8 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 			String value = getDefaultValueForNullData(cachedValue.get(name));
 			String domainMode = getDefaultValueForNullData(cachedValue.get("DomainMode"));
 			String ptpConfigMode = getDefaultValueForNullData(cachedValue.get("PTPConfiguration"));
+			String ptpv2Priority1Value = getDefaultValueForNullData(cachedValue.get("PTPV2Priority1"));
+			String ptpv2Priority2Value = getDefaultValueForNullData(cachedValue.get("PTPV2Priority2"));
 			switch (property) {
 				case CLOCKING:
 				case LATENCY:
@@ -937,7 +939,8 @@ public class DanteDomainManagerCommunicator extends RestCommunicator implements 
 					stats.put(propertyName, newValue);
 					break;
 				case LEADER:
-					if(("DEFAULT".equals(domainMode) && DanteDomainManagerConstant.FALSE.equals(ptpConfigMode)) || "AES67".equals(domainMode) && DanteDomainManagerConstant.TRUE.equals(getDefaultValueForNullData(cachedValue.get(name + DanteDomainManagerConstant.CAPABILITY)))){
+					if(("DEFAULT".equals(domainMode) && DanteDomainManagerConstant.FALSE.equals(ptpConfigMode)) || "AES67".equals(domainMode) && DanteDomainManagerConstant.NOT_AVAILABLE.equals(ptpv2Priority1Value) && DanteDomainManagerConstant.NOT_AVAILABLE.equals(ptpv2Priority2Value)
+							&& DanteDomainManagerConstant.TRUE.equals(getDefaultValueForNullData(cachedValue.get(name + DanteDomainManagerConstant.CAPABILITY)))){
 						addAdvancedControlProperties(advancedControllableProperties, statsControl,
 								createSwitch(propertyName, DanteDomainManagerConstant.TRUE.equals(value) ? 1 : 0, DanteDomainManagerConstant.OFF, DanteDomainManagerConstant.ON),
 								DanteDomainManagerConstant.TRUE.equals(value) ? DanteDomainManagerConstant.NUMBER_ONE : DanteDomainManagerConstant.ZERO);
