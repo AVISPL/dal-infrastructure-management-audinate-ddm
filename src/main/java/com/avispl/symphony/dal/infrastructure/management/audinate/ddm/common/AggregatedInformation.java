@@ -32,12 +32,11 @@ public enum AggregatedInformation {
 	DANTE_SOFTWARE_VERSION("DanteSoftwareVersion", ""),
 	DANTE_VERSION("DanteVersion", ""),
 	DOMAIN_NAME("Domain", ""),
-	MUTE_STATUS("MuteStatus", DanteDomainManagerConstant.CLOCK_SYNCHRONISATION_GROUP),
+
 	SYNC_STATUS("SyncStatus", DanteDomainManagerConstant.CLOCK_SYNCHRONISATION_GROUP),
 	DOMAIN_CLOCKING("DomainClocking", DanteDomainManagerConstant.CLOCK_SYNCHRONISATION_GROUP),
 	PRIMARY_MULTICAST("PrimaryMulticast", DanteDomainManagerConstant.CLOCK_SYNCHRONISATION_GROUP),
 	UNICAST("Unicast", DanteDomainManagerConstant.CLOCK_SYNCHRONISATION_GROUP),
-	FREQUENCY("FrequencyOffset(ppm)", DanteDomainManagerConstant.CLOCK_SYNCHRONISATION_GROUP),
 
 	EXTERNAL_WORD_CLOCK("SyncToExternalWordClock", DanteDomainManagerConstant.CLOCK_SYNCHRONISATION_GROUP),
 	LEADER("PreferredLeader", DanteDomainManagerConstant.CLOCK_SYNCHRONISATION_GROUP),
@@ -45,8 +44,6 @@ public enum AggregatedInformation {
 	PTP_PRIORITY2("PTPV2Priority2", DanteDomainManagerConstant.CLOCK_SYNCHRONISATION_GROUP),
 	UNICAST_CLOCKING("UnicastClocking", DanteDomainManagerConstant.CLOCK_SYNCHRONISATION_GROUP),
 	DELAY_REQUEST("V1DelayRequests", DanteDomainManagerConstant.CLOCK_SYNCHRONISATION_GROUP),
-	RECEIVE_CHANNELS("ReceiveChannels", DanteDomainManagerConstant.RECEIVE_GROUP),
-	TRANSMIT_CHANNELS("TransmitChannels", DanteDomainManagerConstant.TRANSMIT_GROUP),
 	;
 	private final String name;
 	private final String group;
